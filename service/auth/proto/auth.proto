@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package douban.auth;
+
+import "message.proto";
+
+service TokenSrv {
+  rpc GenerateToken(GenerateTokenReq) returns (GenerateTokenResp) {}
+  rpc AuthToken(AuthTokenReq) returns (AuthTokenResp) {}
+}

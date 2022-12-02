@@ -1,0 +1,13 @@
+p, admin, /foo, ANY
+p, user, /foo, GET
+
+g, 0, admin
+g, 1, user
+
+g3, GET, ANY
+g3, POST, ANY
+g3, PATCH, ANY
+g3, PUT, ANY
+g3, DELETE, ANY
+g3, OPTIONS, ANY
+g3, HEAD, ANY
