@@ -1,0 +1,54 @@
+hmac_key: deepdarkfantacy  # 用于签名 jwt (HS256)
+clients:    # 服务 -> 服务密钥 (32bytes)
+  service1: '12345678901234567890123456789012'
+exp_delta:  # 每个服务的 access 令牌过期时间
+  service1: 164800
+refresh_delta_rate: 3  # refresh 令牌过期时间 / access 令牌过期时间
+redis_dsn: redis://127.0.0.1:6379/0  # 令牌缓存
+pub_jwks:  # 公开的 jwk 列表，公开签名的 jwt 将使用下面的一个 jwk 填充到头部，仅支持 RSA
+  keys:
+    - use: sig
+      alg: RS256
+      kid: key1
+      kty: RSA
+      n: iuGt0KucfCBxSqovShdGyQ_1AdfWep3UBgFkemWCvEc40nWQ5WF50UBjvXeNDpTQSTSsjz6trP5u8BXJJdR3N7jZw845uOtk6BKUMJBrIrwKEZoflAxQXbvjEc6sfTZbY6mdcWLMkgweKfFIv6WJZkkcdggFKuiEaVeYbU53clejQbAQLA9_t39JLpdgPXH5bqqZb8g2spfa1R1rUavgwdhuV9idde1_Cv8H4VCYZ7c5qLqSaUxE6IfDVHHIu1Nwv79QLEIOdszmDY4tjNlrtueDuCA7OXQC_kHIpnz4tOIgOv9XudFVXKlhLva9wsTjt5Sai8HeKR5dnxg5EruJbQ
+      e: AQAB
+listen_addr: 0.0.0.0:5001  # 监听地址
+endpoint: 127.0.0.1:5001  # 暴露到外部的 endpoint, 用于服务发现
+etcd_clients:  # 服务发现的 etcd 客户端
+  - 127.0.0.1:2379
+etcd_grant_ttl: 60  # 默认为60s，grant ttl
+etcd_keepalive_interval: 20 # 默认为 20s，keepalive 间隔
+health_check: false  # 默认为 false，是否开启 GRPC 健康检查
+timeout: 30  # 默认为 30s，请求超时时间
+concurrency_limit: 256  # 默认为 256，GRPC 每个连接的并发限制
+encode_pems:  # key id -> RSA 私钥，用于签名 jwt (RS256)
+  key1: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCK4a3Qq5x8IHFK
+    qi9KF0bJD/UB19Z6ndQGAWR6ZYK8RzjSdZDlYXnRQGO9d40OlNBJNKyPPq2s/m7w
+    Fckl1Hc3uNnDzjm462ToEpQwkGsivAoRmh+UDFBdu+MRzqx9NltjqZ1xYsySDB4p
+    8Ui/pYlmSRx2CAUq6IRpV5htTndyV6NBsBAsD3+3f0kul2A9cfluqplvyDayl9rV
+    HWtRq+DB2G5X2J117X8K/wfhUJhntzmoupJpTEToh8NUcci7U3C/v1AsQg52zOYN
+    ji2M2Wu254O4IDs5dAL+QcimfPi04iA6/1e50VVcqWEu9r3CxOO3lJqLwd4pHl2f
+    GDkSu4ltAgMBAAECggEAbFLcTM8dzh9L3k3hdquzFW4xzs83xgnGbyy031a/4vS2
+    WElEy/T8m/7aDNTrm7zsvLyt/0iHFFCb3P1RGAWhO0Ad8kCu+xH3cZ/UIBD0z3HV
+    dKc/DC2SnZnH4YLPPRahr5mDaQYDw8JZ4KMG+Bw4kCRkY5eb2Dzl0nh1NoSmW/Lh
+    AAszE2FcE0WfdbI9JtmOFCtDcOVIGnV8g079y0CiG/QO3/E0Q7u5UBzgwGgtcD6B
+    cuLCn0Acpm5UT9l/kKhxglIuo8pnxB/Q31X/g3cr5IPUarLX7WvCMyZi+GV6j1I+
+    KQPhMt41fUbth3J6fr8/19p32EzEl1C5RjLp+mcIIQKBgQDUGr4zPp5ZQJpXA4HR
+    pzgbBH7tKw6/rjR6niaBEyiwI6ugoE0wN8U9PI9VBdi8mhGHSzHD6Kxfw1H3iVF6
+    9gX8zZgJrfzy4qQbrU9gle4eKrwjyOVHTjBVx8zbj48iTfKKq1fFclAfLb40OMR9
+    Ic+j9iFk9FGHwzrBg5fdCJ03aQKBgQCnn5lwZg9zGHKd8faOt3JFRdmaEXKevOJj
+    ClHSZjmGED589L+a88RHndtLM+1MvUGGoKRjifsolkN1ogU/c6PfRq1Ozo4MVh2o
+    UerwwVbAFGv0bC0xP0HQxAxgRHISdJgQn9XqW72RVWdpunRUcdpY9LyTJPXN7SWU
+    K4GkBk6lZQKBgQDHhKCF89Fgg7SrRVFItdPBFmmPD4HALU6QSVRO9oa/qc44OpJh
+    WRTglab+g5FtWEBE1Cbr8mKzcjgYccODtwnK1FrAQDpA/5D/t/eDE4X6Opjf0Ipc
+    mOA+0MOThWdPDaOpbaQSx4U2zwCsfvnV+4gm49Bl9qz62Frczbx83y2EgQKBgAS7
+    Up+DoggDtqiSvf0FXKpr8FqTB4NHnbRiBDFGRXVtW/Y3CnmbS/0hjaEv1BEIfqMI
+    Qdu1d2uL4ledvTwvTX7uBdJlrkjW3Xt05IbrTkGZ0fpSW2w6ducnwZmuFPJEbE57
+    1JQLBuzlVkf7xXDkzd8Y+YHF11J60Ua/e6dfrjSpAoGASfShV59FiFXPrcjTf+EM
+    VHaB/PehQgm/RYjLtVKzEZu/NGB57nKzuPNGB7DnX6vM+E70c3lqz+qlw3R6YtK0
+    69CyRTQoPOnvgYkd1k70frKF2lRfehGwmJBgQTSIzUASdrtJipOM02v1x8faV+DL
+    c18+HlaE4v5HeLpjEM0FHy0=
+    -----END PRIVATE KEY-----

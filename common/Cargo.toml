@@ -16,10 +16,17 @@ tower-http = { version = "0.3.4", features = ["full"] }
 once_cell = "1.16.0"
 chrono = "0.4.23"
 jsonwebtoken = "8"
-uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
 serde_json = "1.0.89"
-base64 = "0.13.1"
+base64 = "0.20.0"
 pin-project-lite = "0.2.9"
+async-trait = "0.1.59"
+auto_impl = "1.0.1"
+toml = "0.5"
+serde_yaml = "0.9"
+notify = "5.0.0"
+parking_lot = "0.12"
+kosei = { version = "0.1.2", features = ["full"] }
 # tracing
 log = "0.4"
 tracing = "0.1"
@@ -30,7 +37,13 @@ http = "0.2.8"
 http-body = "0.4.5"
 hyper = "0.14.23"
 cookie = "0.16.1"
+reqwest = { version = "0.11", features = ["json"] }
+urlencoding = "2.1.2"
 # casbin
 casbin = "2.0.9"
-# axum http
-axum = "0.6.1"
+# etcd
+etcd-client = "0.10"
+# tonic
+tonic = { version = "0.8.3", features = ["transport"] }
+# rand id
+rand = "0.8.5"

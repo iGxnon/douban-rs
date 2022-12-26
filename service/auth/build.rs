@@ -1,7 +1,7 @@
 use std::path::Path;
 
 fn main() {
-    let proto = "proto/auth.proto";
+    let proto = "proto/token.proto";
     let proto_path: &Path = proto.as_ref();
     let proto_dir = proto_path
         .parent()
