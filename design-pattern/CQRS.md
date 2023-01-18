@@ -1,3 +1,5 @@
+## Command Query Responsibility Segregation
+
 CQRS 是一种思想，主要是把请求分为 `Command` 和 `Query` 两种，并针对这两种请求采取不同的策略。
 
 例如：https://github.com/banq/jivejdon
