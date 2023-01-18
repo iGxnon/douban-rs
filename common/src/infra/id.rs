@@ -14,8 +14,8 @@ use uuid::Uuid;
 
 pub struct UUID<T>(Uuid, PhantomData<T>);
 pub enum Id<T> {
-    UserIdStr(String, PhantomData<T>),
-    UserIdU64(u64, PhantomData<T>),
+    Str(String, PhantomData<T>),
+    U64(u64, PhantomData<T>),
 }
 
 impl<T> fmt::Debug for UUID<T> {
@@ -27,8 +27,8 @@ impl<T> fmt::Debug for UUID<T> {
 impl<T> fmt::Debug for Id<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Id::UserIdStr(id, _) => fmt::Debug::fmt(id, f),
-            Id::UserIdU64(id, _) => fmt::Debug::fmt(id, f),
+            Id::Str(id, _) => fmt::Debug::fmt(id, f),
+            Id::U64(id, _) => fmt::Debug::fmt(id, f),
         }
     }
 }
@@ -42,8 +42,8 @@ impl<T> fmt::Display for UUID<T> {
 impl<T> fmt::Display for Id<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            Id::UserIdStr(id, _) => fmt::Display::fmt(id, f),
-            Id::UserIdU64(id, _) => fmt::Display::fmt(id, f),
+            Id::Str(id, _) => fmt::Display::fmt(id, f),
+            Id::U64(id, _) => fmt::Display::fmt(id, f),
         }
     }
 }
@@ -57,8 +57,8 @@ impl<T> Clone for UUID<T> {
 impl<T> Clone for Id<T> {
     fn clone(&self) -> Self {
         match self {
-            Id::UserIdStr(id, _) => Id::UserIdStr(id.clone(), PhantomData),
-            Id::UserIdU64(id, _) => Id::UserIdU64(*id, PhantomData),
+            Id::Str(id, _) => Id::Str(id.clone(), PhantomData),
+            Id::U64(id, _) => Id::U64(*id, PhantomData),
         }
     }
 }
@@ -126,24 +126,24 @@ impl<T> UUID<T> {
 impl<T> Id<T> {
     #[allow(clippy::new_without_default)]
     pub fn new_u64() -> Self {
-        Id::UserIdU64(0, PhantomData)
+        Id::U64(0, PhantomData)
     }
     #[allow(clippy::new_without_default)]
     pub fn new_str() -> Self {
-        Id::UserIdStr("".to_string(), PhantomData)
+        Id::Str("".to_string(), PhantomData)
     }
 
     pub fn as_string(&self) -> String {
         match self {
-            Id::UserIdStr(id, _) => id.to_owned(),
-            Id::UserIdU64(id, _) => id.to_string(),
+            Id::Str(id, _) => id.to_owned(),
+            Id::U64(id, _) => id.to_string(),
         }
     }
 
     pub fn as_u64(&self) -> Result<u64, ParseIntError> {
         match self {
-            Id::UserIdStr(id, _) => id.parse::<u64>(),
-            Id::UserIdU64(id, _) => Ok(id.to_owned()),
+            Id::Str(id, _) => id.parse::<u64>(),
+            Id::U64(id, _) => Ok(id.to_owned()),
         }
     }
 }
@@ -158,7 +158,13 @@ impl<'a, T> TryFrom<&'a str> for UUID<T> {
 
 impl<'a, T> From<&'a str> for Id<T> {
     fn from(id: &'a str) -> Self {
-        Id::UserIdStr(id.to_string(), PhantomData)
+        Id::Str(id.to_string(), PhantomData)
+    }
+}
+
+impl<T> From<u64> for Id<T> {
+    fn from(id: u64) -> Self {
+        Id::U64(id, PhantomData)
     }
 }
 
@@ -207,7 +213,7 @@ impl<'de, T> Deserialize<'de> for Id<T> {
             where
                 E: serde::de::Error,
             {
-                Ok(Id::UserIdStr(v.to_string(), PhantomData))
+                Ok(Id::Str(v.to_string(), PhantomData))
             }
         }
         deserializer.deserialize_str(IdVisitor(PhantomData))

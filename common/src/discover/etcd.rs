@@ -1,110 +1,152 @@
+use super::*;
+use crate::middleware::etcd::Etcd;
+use crate::middleware::Middleware;
 use etcd_client::{EventType, PutOptions, WatchOptions};
+use log::warn;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tonic::transport::Endpoint;
 use tower::discover::Change;
-use tower::BoxError;
+use tracing::Instrument;
 use tracing::{debug, error, info};
+use tracing_attributes::instrument;
 
-pub async fn register_service(
-    client: &mut etcd_client::Client,
-    service_name: &str,
-    endpoint: &str,
-    grant_ttl: i64,
-    keep_alive_interval: u64,
-) -> Result<(), BoxError> {
-    debug_assert!(grant_ttl > keep_alive_interval as i64);
+#[derive(Debug, Default)]
+pub struct EtcdDiscover(EtcdDiscoverConf);
 
-    let lease_id = client.lease_grant(grant_ttl, None).await?.id();
-    let (mut keeper, _) = client.lease_keep_alive(lease_id).await?;
-
-    tokio::spawn(async move {
-        loop {
-            if let Err(err) = keeper.keep_alive().await {
-                error!("[discover] keep lease alive failed cause err: {}", err);
-                break;
-            }
-            debug!("[discover] kept lease alive");
-            tokio::time::sleep(Duration::from_secs(keep_alive_interval)).await;
-        }
-    });
-
-    let id = rand::random::<u32>();
-    debug!("[discover] generated service instance id: {}", id);
-
-    client
-        .put(
-            format!("{}:{}", service_name, id),
-            endpoint,
-            Some(PutOptions::new().with_lease(lease_id)),
-        )
-        .await?;
-
-    Ok(())
+impl EtcdDiscover {
+    pub fn new(conf: EtcdDiscoverConf) -> Self {
+        Self(conf)
+    }
 }
 
-pub async fn channel_discover(
-    client: &mut etcd_client::Client,
-    service_name: &str,
-    tx: Sender<Change<String, Endpoint>>,
-) -> Result<(), BoxError> {
-    let (mut watcher, mut stream) = client
-        .watch(service_name, Some(WatchOptions::new().with_prefix()))
-        .await?;
-    watcher.request_progress().await.unwrap();
+#[async_trait]
+impl Discover<String> for EtcdDiscover {
+    type Error = etcd_client::Error;
 
-    let watch_id = watcher.watch_id();
-    info!("[discover] create a watch id {}", watch_id);
+    #[instrument(err, skip(self))]
+    async fn register_service(&self) -> Result<(), Self::Error> {
+        let grant_ttl = self.0.grant_ttl;
+        let keep_alive_interval = self.0.keep_alive_interval;
 
-    tokio::spawn(async move {
-        while let Ok(Some(resp)) = stream.message().await {
-            if resp.canceled() {
-                info!(
-                    "[discover] watcher has been canceled, reason: {}",
-                    resp.cancel_reason()
-                );
-                break;
+        debug_assert!(grant_ttl > keep_alive_interval as i64);
+
+        let etcd = Etcd::new(self.0.etcd.clone());
+        let mut client = etcd.make_client().await?;
+
+        let lease_id = client.lease_grant(grant_ttl, None).await?.id();
+        let (mut keeper, _) = client.lease_keep_alive(lease_id).await?;
+
+        let task = async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(keep_alive_interval));
+            loop {
+                tick.tick().await;
+                if let Err(err) = keeper.keep_alive().await {
+                    error!("keep lease alive failed cause err: {}", err);
+                    break;
+                }
+                debug!("kept lease alive");
             }
-            if resp.created() {
-                info!("[discover] watcher create a new watch request");
-            }
+        }
+        .in_current_span();
 
-            for event in resp.events() {
-                match event.event_type() {
-                    EventType::Put => {
-                        if let Some(kv) = event.kv() {
-                            let key = kv.key_str().unwrap();
-                            let value = kv.value_str().unwrap();
+        tokio::spawn(task);
 
-                            if kv.version() == 1 {
-                                info!("[discover] discover a new service {}: {}", key, value);
-                            } else {
-                                info!(
-                                    "[discover] service {} changed its endpoint to {}",
-                                    key, value
-                                )
-                            }
+        let domain = self.0.service.domain.as_str();
+        let name = self.0.service.name.as_str();
+        let discover_addr = self.0.service.discover_addr.as_str();
 
-                            if let Ok(endpoint) = Endpoint::from_str(value) {
-                                let _ = tx.send(Change::Insert(key.to_string(), endpoint)).await;
-                            } else {
-                                error!("[discover] unexpected service endpoint {}, cannot parse it to an Endpoint", value);
+        client
+            .put(
+                format!("{}:{}", domain, name),
+                discover_addr,
+                Some(PutOptions::new().with_lease(lease_id)),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    #[instrument(err, skip(self))]
+    async fn discover_to_channel(
+        &self,
+        tx: Sender<Change<String, Endpoint>>,
+    ) -> Result<(), Self::Error> {
+        let etcd = Etcd::new(self.0.etcd.clone());
+        let mut client = etcd.make_client().await?;
+
+        let domain = self.0.service.domain.as_str();
+
+        let (mut watcher, mut stream) = client
+            .watch(domain, Some(WatchOptions::new().with_prefix()))
+            .await?;
+        watcher.request_progress().await.unwrap();
+
+        let watch_id = watcher.watch_id();
+        info!("create a watch id {}", watch_id);
+
+        let task = async move {
+            while let Ok(Some(resp)) = stream.message().await {
+                if resp.canceled() {
+                    warn!(
+                        "watcher has been canceled, reason: {}",
+                        resp.cancel_reason()
+                    );
+                    break;
+                }
+                if resp.created() {
+                    info!("watcher create a new watch request");
+                }
+
+                for event in resp.events() {
+                    match event.event_type() {
+                        EventType::Put => {
+                            if let Some(kv) = event.kv() {
+                                let key = kv.key_str().unwrap();
+                                let value = kv.value_str().unwrap();
+
+                                if kv.version() == 1 {
+                                    info!("discover a new service {}: {}", key, value);
+                                } else {
+                                    info!("service {} changed its endpoint to {}", key, value)
+                                }
+
+                                if let Ok(endpoint) = Endpoint::from_str(value) {
+                                    let _ =
+                                        tx.send(Change::Insert(key.to_string(), endpoint)).await;
+                                } else {
+                                    error!("unexpected service endpoint {}, cannot parse it to an Endpoint", value);
+                                }
                             }
                         }
-                    }
-                    EventType::Delete => {
-                        if let Some(kv) = event.kv() {
-                            let key = kv.key_str().unwrap();
-                            info!("[discover] service {} is down", key);
+                        EventType::Delete => {
+                            if let Some(kv) = event.kv() {
+                                let key = kv.key_str().unwrap();
+                                info!("service {} is going down", key);
 
-                            let _ = tx.send(Change::Remove(key.to_string())).await;
+                                let _ = tx.send(Change::Remove(key.to_string())).await;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        }.in_current_span();
 
-    Ok(())
+        tokio::spawn(task);
+
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn test_discover() {
+    tracing_subscriber::fmt::init();
+    let etcd = EtcdConf::default();
+    let service = ServiceConf::default();
+    let conf = EtcdDiscoverConf::new(etcd, service);
+    let discover = EtcdDiscover::new(conf);
+    let ok = discover.register_service().await;
+    println!("{:?}", discover);
+    println!("{:?}", ok);
 }

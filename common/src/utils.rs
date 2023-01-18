@@ -2,8 +2,9 @@ use kosei::{ApolloClient, Config, ConfigType};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
-
-pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(service_name: &str) -> Result<E, Error> {
+pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(
+    service_name: &str,
+) -> Result<E, Error> {
     let typ = std::env::var("CONFIG_TYPE")?;
     match typ.to_lowercase().as_str() {
         "file" => {
@@ -13,7 +14,8 @@ pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(service_name: 
         }
         "apollo" => {
             let appid = std::env::var("APOLLO_APP_ID")?;
-            let cluster_name = std::env::var("APOLLO_CLUSTER_NAME").unwrap_or_else(|_| "default".into());
+            let cluster_name =
+                std::env::var("APOLLO_CLUSTER_NAME").unwrap_or_else(|_| "default".into());
             let apollo_addr = std::env::var("APOLLO_ADDR")?;
             let apollo_secret = std::env::var("APOLLO_SECRET").ok();
 
@@ -26,6 +28,6 @@ pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(service_name: 
 
             Ok(Config::<E>::from_apollo(&apollo_client).await?.into_inner())
         }
-        _ => panic!("unsupported config type")
+        _ => panic!("unsupported config type"),
     }
 }

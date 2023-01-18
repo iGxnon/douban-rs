@@ -1,12 +1,64 @@
-// 规范化读写时的函数签名
-// 读：使用 &self 不夺取 Read 所有权，可以多次读取
-// 写：使用 self 夺取 Write 所有权，只能一次写入
+// CQRS
+// From https://github.com/KodrAus/rust-web-app#commands-and-queries
+
+// Defined a CQRS basic model with trait `Command` and `Query`
+// `Command` takes ownerships from types whereas `Query` borrows
+// from types. The commands capture some domain interaction and work
+// directly on entities whereas queries are totally arbitrary.
+// The difference in receivers means commands can call queries
+// but queries can't call commands.
 
 use async_trait::async_trait;
 use std::future::Future;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 pub trait Args {
     type Output;
+}
+
+pub struct GetFrom<T, E, D> {
+    from: D,
+    _data: (PhantomData<T>, PhantomData<E>),
+}
+
+impl<T, E, D> GetFrom<T, E, D> {
+    pub fn new(from: D) -> Self {
+        Self {
+            from,
+            _data: (Default::default(), Default::default()),
+        }
+    }
+
+    pub fn src(&self) -> &D {
+        &self.from
+    }
+}
+
+impl<T, E, D> Args for GetFrom<T, E, D> {
+    type Output = Result<T, E>;
+}
+
+pub struct SetInto<E, D> {
+    into: D,
+    _data: PhantomData<E>,
+}
+
+impl<E, D> SetInto<E, D> {
+    pub fn new(into: D) -> Self {
+        Self {
+            into,
+            _data: Default::default(),
+        }
+    }
+
+    pub fn dst(&self) -> &D {
+        &self.into
+    }
+}
+
+impl<E, D> Args for SetInto<E, D> {
+    type Output = Result<(), E>;
 }
 
 #[async_trait]
@@ -20,10 +72,10 @@ pub trait Query<TArgs: Args> {
 }
 
 #[async_trait]
-impl<TArgs, TWrite, TFuture> Command<TArgs> for TWrite
+impl<TArgs, TCommand, TFuture> Command<TArgs> for TCommand
 where
     TArgs: Args + Send + 'static,
-    TWrite: (FnOnce(TArgs) -> TFuture) + Send,
+    TCommand: (FnOnce(TArgs) -> TFuture) + Send,
     TFuture: Future<Output = TArgs::Output> + Send,
 {
     async fn execute(self, input: TArgs) -> TArgs::Output {
@@ -32,10 +84,10 @@ where
 }
 
 #[async_trait]
-impl<TArgs, TRead, TFuture> Query<TArgs> for TRead
+impl<TArgs, TQuery, TFuture> Query<TArgs> for TQuery
 where
     TArgs: Args + Send + 'static,
-    TRead: (Fn(TArgs) -> TFuture) + Sync,
+    TQuery: (Fn(TArgs) -> TFuture) + Sync,
     TFuture: Future<Output = TArgs::Output> + Send,
 {
     async fn execute(&self, input: TArgs) -> TArgs::Output {

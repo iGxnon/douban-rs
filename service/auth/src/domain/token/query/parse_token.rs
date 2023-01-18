@@ -1,41 +1,33 @@
-use jsonwebtoken::DecodingKey;
-
-use common::infra::{Args, Query};
-
-use crate::domain::token::error::Error;
+use super::super::pb;
 use crate::domain::token::model::Token;
 use crate::domain::token::Resolver;
-use crate::pb;
-use crate::pb::TokenKind;
+use common::infra::{Args, Query};
+use tonic::Status;
 
-pub struct ParseToken {
-    pub token: pb::Token,
-    pub secret: Option<String>,
-}
-
-impl Args for ParseToken {
-    type Output = Result<pb::ParseTokenResp, Error>;
+impl Args for pb::ParseTokenReq {
+    type Output = Result<pb::ParseTokenRes, Status>;
 }
 
 async fn execute(
-    token: pb::Token,
-    secret: Option<String>,
-    decode_key: &DecodingKey,
-) -> Result<pb::ParseTokenResp, Error> {
-    let payload = if token.kind() == TokenKind::Public {
-        let payload = Token::from_pub_token(&token)?.claim.into_inner();
-        serde_json::to_string(&payload).map_err(Error::SerializerError)?
-    } else {
-        let payload = Token::from_pri_token(&token, decode_key, secret)?
-            .claim
-            .into_inner();
-        serde_json::to_string(&payload).map_err(Error::SerializerError)?
-    };
-    Ok(pb::ParseTokenResp { payload })
+    req: pb::ParseTokenReq,
+    key: &jsonwebtoken::DecodingKey,
+    algorithm: jsonwebtoken::Algorithm,
+) -> Result<pb::ParseTokenRes, Status> {
+    let token: Token = req.value.as_str().parse()?;
+    let checked = token.validate(key, algorithm)?;
+    let kind: pb::TokenKind = token.kind().into();
+    Ok(pb::ParseTokenRes {
+        checked,
+        expired: token.is_expired(),
+        kind: kind as i32,
+        payload: token.payload().cloned().and_then(|payload| payload.detail),
+    })
 }
 
 impl Resolver {
-    pub fn create_parse_token(&self) -> impl Query<ParseToken> + '_ {
-        move |req: ParseToken| async { execute(req.token, req.secret, self.decode_key()).await }
+    pub fn create_parse_token(&self) -> impl Query<pb::ParseTokenReq> + '_ {
+        move |req: pb::ParseTokenReq| async move {
+            execute(req, &self.decode_key(), self.algorithm()).await
+        }
     }
 }

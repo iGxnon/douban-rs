@@ -70,7 +70,7 @@ where
         let act = req.method().as_str();
         event!(
             Level::TRACE,
-            target = "middleware:role_map",
+            target = "layer:role_map",
             "start to enforce sub({}), obj({}), act({})",
             sub,
             obj,
@@ -84,7 +84,7 @@ where
                 } else {
                     event!(
                         Level::INFO,
-                        target = "middleware:role_map",
+                        target = "layer:role_map",
                         "enforce sub({}), obj({}), act({}) failed, no authorized!",
                         sub,
                         obj,
@@ -101,7 +101,7 @@ where
             Err(err) => {
                 event!(
                     Level::ERROR,
-                    target = "middleware:role_map",
+                    target = "layer:role_map",
                     "enforcer is working abnormally, err: {:?}",
                     err
                 );

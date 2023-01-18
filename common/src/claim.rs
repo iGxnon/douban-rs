@@ -1,26 +1,26 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-fn eq_zero(i: &usize) -> bool {
+fn eq_zero(i: &u64) -> bool {
     *i == 0
 }
 
 pub struct Builder<T> {
-    inner: AuthClaim<T>,
+    inner: Claim<T>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuthClaim<T> {
-    exp: usize, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
+pub struct Claim<T> {
+    exp: u64, // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(default)]
     aud: String, // Optional. Audience
     #[serde(skip_serializing_if = "eq_zero")]
     #[serde(default)]
-    iat: usize, // Optional. Issued at (as UTC timestamp)
+    iat: u64, // Optional. Issued at (as UTC timestamp)
     #[serde(skip_serializing_if = "eq_zero")]
     #[serde(default)]
-    nbf: usize, // Optional. Not Before (as UTC timestamp)
+    nbf: u64, // Optional. Not Before (as UTC timestamp)
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(default)]
     iss: String, // Optional. Issuer
@@ -29,23 +29,23 @@ pub struct AuthClaim<T> {
     sub: String, // Optional. Subject (whom token refers to)
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(default)]
-    jti: String, // Optional. JWT ID (a unique identifier for the JWT.) 只使用一次的 jwt 使用，预防重放攻击
+    jti: String, // Optional. JWT ID (a unique identifier for the JWT.)
     #[serde(skip_serializing_if = "Option::is_none")]
     payload: Option<T>, // Optional. other payloads in JWT
 }
 
-impl<T> AuthClaim<T>
+impl<T> Claim<T>
 where
     T: Clone,
 {
-    pub fn builder(exp: usize) -> Builder<T> {
+    pub fn builder(exp: u64) -> Builder<T> {
         Builder {
-            inner: AuthClaim::new(exp),
+            inner: Claim::new(exp),
         }
     }
 
-    pub fn new(exp: usize) -> Self {
-        AuthClaim {
+    pub fn new(exp: u64) -> Self {
+        Claim {
             exp,
             aud: "".to_string(),
             iat: 0,
@@ -72,12 +72,12 @@ where
         self
     }
 
-    pub fn not_before(&mut self, nbf: usize) -> &mut Self {
+    pub fn not_before(&mut self, nbf: u64) -> &mut Self {
         self.nbf = nbf;
         self
     }
 
-    pub fn issue_at(&mut self, iat: usize) -> &mut Self {
+    pub fn issue_at(&mut self, iat: u64) -> &mut Self {
         self.iat = iat;
         self
     }
@@ -121,15 +121,15 @@ where
         &self.jti
     }
 
-    pub fn as_exp(&self) -> usize {
+    pub fn as_exp(&self) -> u64 {
         self.exp
     }
 
-    pub fn as_iat(&self) -> usize {
+    pub fn as_iat(&self) -> u64 {
         self.iat
     }
 
-    pub fn as_nbf(&self) -> usize {
+    pub fn as_nbf(&self) -> u64 {
         self.nbf
     }
 }
@@ -150,12 +150,12 @@ impl<T> Builder<T> {
         self
     }
 
-    pub fn not_before(mut self, nbf: usize) -> Self {
+    pub fn not_before(mut self, nbf: u64) -> Self {
         self.inner.nbf = nbf;
         self
     }
 
-    pub fn issue_at(mut self, iat: usize) -> Self {
+    pub fn issue_at(mut self, iat: u64) -> Self {
         self.inner.iat = iat;
         self
     }
@@ -170,7 +170,7 @@ impl<T> Builder<T> {
         self
     }
 
-    pub fn payload(mut self, payload: T) -> AuthClaim<T> {
+    pub fn payload(mut self, payload: T) -> Claim<T> {
         self.inner.payload = Some(payload);
         self.inner
     }

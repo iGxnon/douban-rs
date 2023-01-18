@@ -6,3 +6,21 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# basic
+tokio = { version = "1.22.0", features = ["full"] }
+futures = "0.3.25"
+serde = {version = "1.0", features = ["derive"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.3.4", features = ["full"] }
+# axum
+axum = { version = "0.6", features = ["headers"] }
+# tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# jwt
+jsonwebtoken = "8.2"
+# thiserror
+thiserror = "1.0.37"
+anyhow = "1.0"
+# common
+common = { path = "../../common" }

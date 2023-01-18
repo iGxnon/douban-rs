@@ -3,8 +3,8 @@ syntax = "proto3";
 package douban.auth.token;
 
 enum TokenKind {
-  private = 0; // private (HS256)
-  public = 1;  // public (RS256)
+  Access = 0;
+  Refresh = 1;
 }
 
 message Token {
@@ -12,36 +12,45 @@ message Token {
   TokenKind kind = 2;
 }
 
+message Payload {
+  string group = 1;
+  string extra = 2;
+}
+
 message GenerateTokenReq {
-  string id = 1;  // token id | user id | whom the token for | sub
-  string sid = 2;  // service id | client id | audience | aud
-  TokenKind kind = 3;  // token kind
-  optional string secret = 4;  // client secret (OPTIONAL) enable for higher security signature, used to encrypt jwt
+  string sub = 1;
+  string aud = 2;
+  optional bool jti = 3;
+  optional Payload payload = 4;
 }
 
-message GenerateTokenResp {
-  repeated Token token = 3;
+message GenerateTokenRes {
+  Token access = 1;
+  Token refresh = 2;
 }
-
-message AuthTokenReq {
-  string id = 1;  // token id | user id | whom the token for
-  optional string secret = 2;  // client secret (OPTIONAL) enable for higher security signature, used to decrypt jwt
-  Token token = 3;
-}
-
-message AuthTokenResp {}
 
 message ParseTokenReq {
-  Token token = 1;
-  optional string secret = 2;  // client secret (OPTIONAL) enable for higher security signature, used to encrypt jwt
+  string value = 1;
 }
 
-message ParseTokenResp {
-  string payload = 3;  // only serialize the payload field
+message ParseTokenRes {
+  bool checked = 1;
+  bool expired = 2;
+  TokenKind kind = 3;
+  Payload payload = 4;
 }
 
-service TokenSrv {
-  rpc GenerateToken(GenerateTokenReq) returns (GenerateTokenResp) {}
-  rpc AuthToken(AuthTokenReq) returns (AuthTokenResp) {}
-  rpc ParseToken(ParseTokenReq) returns (ParseTokenResp) {}
+message RefreshTokenReq {
+  Token refresh = 1;
+}
+
+message RefreshTokenRes {
+  Token access = 1;
+  Token refresh = 2;
+}
+
+service TokenService {
+  rpc GenerateToken(GenerateTokenReq) returns (GenerateTokenRes) {}
+  rpc ParseToken(ParseTokenReq) returns (ParseTokenRes) {}
+  rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenRes) {}
 }

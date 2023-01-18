@@ -10,6 +10,9 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/cli/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/service/auth_new/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/service/auth_old/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/common/common-macros/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/service/auth/target" />
       <excludeFolder url="file://$MODULE_DIR$/service/movie/target" />
