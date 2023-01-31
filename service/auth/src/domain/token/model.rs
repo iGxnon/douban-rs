@@ -1,21 +1,19 @@
 pub mod store;
 
-use super::pb;
 use base64::Engine;
+use common::status::prelude::*;
 use common::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::jwk::Jwk;
+use proto::pb::auth::token::v1 as pb;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use tonic::Status;
 
 const LEE_WAY: u64 = 60;
 
 pub type TokenId = infra::Id<Token>;
 pub type Claim = claim::Claim<Payload>;
-
-type Result<T> = std::result::Result<T, Status>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
@@ -35,7 +33,7 @@ pub struct Payload {
     pub detail: Option<pb::Payload>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum TokenKind {
     #[serde(rename = "access")]
     Access,
@@ -91,24 +89,24 @@ impl TokenClaim {
 }
 
 impl TryFrom<pb::Token> for Token {
-    type Error = Status;
+    type Error = GrpcStatus;
 
-    fn try_from(value: pb::Token) -> Result<Self> {
+    fn try_from(value: pb::Token) -> GrpcResult<Self> {
         Token::from_pb(value)
     }
 }
 
-fn expect_two<I: Iterator>(mut split: I) -> Result<(I::Item, I::Item)> {
+fn expect_two<I: Iterator>(mut split: I) -> GrpcResult<(I::Item, I::Item)> {
     match (split.next(), split.next(), split.next()) {
         (Some(one), Some(two), None) => Ok((one, two)),
-        _ => Err(invalid_argument!("token", "valid jwt format with 3 dot")),
+        _ => Err(invalid_argument!("token", "valid jwt format with 3 dot").into()),
     }
 }
 
 impl FromStr for Token {
-    type Err = Status;
+    type Err = GrpcStatus;
 
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let (claim, signature, message) = Token::parse_raw(value)?;
         let payload = claim
             .as_payload()
@@ -158,7 +156,7 @@ impl Token {
         }
     }
 
-    pub fn from_pb(value: pb::Token) -> Result<Self> {
+    pub fn from_pb(value: pb::Token) -> GrpcResult<Self> {
         match value.kind() {
             pb::TokenKind::Access => {
                 let (claim, signature, message) = Token::parse_raw(value.value.as_str())?;
@@ -189,7 +187,7 @@ impl Token {
         }
     }
 
-    fn parse_raw(value: &str) -> Result<(Claim, &str, &str)> {
+    fn parse_raw(value: &str) -> GrpcResult<(Claim, &str, &str)> {
         let (signature, message) = expect_two(value.rsplitn(2, '.'))?;
         let (claim, _) = expect_two(message.rsplitn(2, '.'))?;
         let decode = base64::prelude::BASE64_URL_SAFE_NO_PAD
@@ -209,7 +207,7 @@ impl Token {
         &self,
         key: &jsonwebtoken::DecodingKey,
         algorithm: jsonwebtoken::Algorithm,
-    ) -> Result<bool> {
+    ) -> GrpcResult<bool> {
         let signature = self.raw_parts.0.as_str();
         let message = self.raw_parts.1.as_str();
         let check = jsonwebtoken::crypto::verify(signature, message.as_ref(), key, algorithm)
@@ -220,7 +218,7 @@ impl Token {
         Ok(check)
     }
 
-    pub fn validate_from_header(&self) -> Result<bool> {
+    pub fn validate_from_header(&self) -> GrpcResult<bool> {
         let (_, header) = expect_two(self.raw_parts.1.rsplitn(2, '.'))?;
         let decode = base64::prelude::BASE64_URL_SAFE_NO_PAD
             .decode(header)
@@ -247,7 +245,7 @@ impl Token {
         &mut self,
         key: &jsonwebtoken::EncodingKey,
         algorithm: jsonwebtoken::Algorithm,
-    ) -> Result<String> {
+    ) -> GrpcResult<String> {
         let header = jsonwebtoken::Header::new(algorithm);
         self._sign(key, &header)
     }
@@ -256,7 +254,7 @@ impl Token {
         &mut self,
         key: &jsonwebtoken::EncodingKey,
         header: &jsonwebtoken::Header,
-    ) -> Result<String> {
+    ) -> GrpcResult<String> {
         let signed = jsonwebtoken::encode(header, self.claim.inner(), key)
             .map_err(|_| internal!("cannot encode jwt with argument"))?;
         let (signature, message) = expect_two(signed.rsplitn(2, '.'))?;
@@ -269,7 +267,7 @@ impl Token {
         key: &jsonwebtoken::EncodingKey,
         algorithm: jsonwebtoken::Algorithm,
         jwk: Jwk,
-    ) -> Result<String> {
+    ) -> GrpcResult<String> {
         let mut header = jsonwebtoken::Header::new(algorithm);
         header.jwk = Some(jwk);
         self._sign(key, &header)
@@ -279,7 +277,7 @@ impl Token {
         self,
         key: &jsonwebtoken::EncodingKey,
         algorithm: jsonwebtoken::Algorithm,
-    ) -> Result<pb::Token> {
+    ) -> GrpcResult<pb::Token> {
         if !self.is_signed() {
             return self.to_pb_signed(key, algorithm);
         }
@@ -290,7 +288,7 @@ impl Token {
         mut self,
         key: &jsonwebtoken::EncodingKey,
         algorithm: jsonwebtoken::Algorithm,
-    ) -> Result<pb::Token> {
+    ) -> GrpcResult<pb::Token> {
         let kind = match self.claim {
             TokenClaim::Access(_) => pb::TokenKind::Access,
             TokenClaim::Refresh(_) => pb::TokenKind::Refresh,
@@ -328,6 +326,7 @@ fn test() {
                 id: "1".into(),
                 kind: TokenKind::Access,
                 detail: Some(pb::Payload {
+                    sub: "".to_string(),
                     group: "user".to_string(),
                     extra: "".to_string(),
                 }),

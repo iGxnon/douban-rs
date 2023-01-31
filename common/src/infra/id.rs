@@ -156,6 +156,12 @@ impl<'a, T> TryFrom<&'a str> for UUID<T> {
     }
 }
 
+impl<T> From<String> for Id<T> {
+    fn from(value: String) -> Self {
+        Id::Str(value, PhantomData)
+    }
+}
+
 impl<'a, T> From<&'a str> for Id<T> {
     fn from(id: &'a str) -> Self {
         Id::Str(id.to_string(), PhantomData)

@@ -1,7 +1,7 @@
 use super::*;
 use crate::middleware::etcd::Etcd;
 use crate::middleware::Middleware;
-use etcd_client::{EventType, PutOptions, WatchOptions};
+use etcd_client::{EventType, GetOptions, PutOptions, WatchOptions};
 use log::warn;
 use std::str::FromStr;
 use std::time::Duration;
@@ -25,8 +25,11 @@ impl EtcdDiscover {
 impl Discover<String> for EtcdDiscover {
     type Error = etcd_client::Error;
 
-    #[instrument(err, skip(self))]
-    async fn register_service(&self) -> Result<(), Self::Error> {
+    #[instrument(err, skip_all)]
+    async fn register_service<R: DomainProvider>(
+        &self,
+        domain_provider: R,
+    ) -> Result<(), Self::Error> {
         let grant_ttl = self.0.grant_ttl;
         let keep_alive_interval = self.0.keep_alive_interval;
 
@@ -53,7 +56,7 @@ impl Discover<String> for EtcdDiscover {
 
         tokio::spawn(task);
 
-        let domain = self.0.service.domain.as_str();
+        let domain = domain_provider.domain();
         let name = self.0.service.name.as_str();
         let discover_addr = self.0.service.discover_addr.as_str();
 
@@ -68,15 +71,16 @@ impl Discover<String> for EtcdDiscover {
         Ok(())
     }
 
-    #[instrument(err, skip(self))]
-    async fn discover_to_channel(
+    #[instrument(err, skip_all)]
+    async fn discover_to_channel<R: DomainProvider>(
         &self,
+        domain_provider: R,
         tx: Sender<Change<String, Endpoint>>,
     ) -> Result<(), Self::Error> {
         let etcd = Etcd::new(self.0.etcd.clone());
         let mut client = etcd.make_client().await?;
 
-        let domain = self.0.service.domain.as_str();
+        let domain = domain_provider.domain();
 
         let (mut watcher, mut stream) = client
             .watch(domain, Some(WatchOptions::new().with_prefix()))
@@ -86,7 +90,26 @@ impl Discover<String> for EtcdDiscover {
         let watch_id = watcher.watch_id();
         info!("create a watch id {}", watch_id);
 
+        let res = client
+            .get(domain, Some(GetOptions::new().with_prefix()))
+            .await?;
+
+        info!("initial discover {} services", res.count());
+
         let task = async move {
+
+            for kv in res.kvs() {
+                let key = kv.key_str().unwrap();
+                let value = kv.value_str().unwrap();
+
+                if let Ok(endpoint) = Endpoint::from_str(value) {
+                    let _ =
+                        tx.send(Change::Insert(key.to_string(), endpoint)).await;
+                } else {
+                    error!("unexpected service endpoint {}, cannot parse it to an Endpoint", value);
+                }
+            }
+
             while let Ok(Some(resp)) = stream.message().await {
                 if resp.canceled() {
                     warn!(
@@ -146,7 +169,7 @@ async fn test_discover() {
     let service = ServiceConf::default();
     let conf = EtcdDiscoverConf::new(etcd, service);
     let discover = EtcdDiscover::new(conf);
-    let ok = discover.register_service().await;
+    let ok = discover.register_service("sys").await;
     println!("{:?}", discover);
     println!("{:?}", ok);
 }

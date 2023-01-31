@@ -1,30 +1,32 @@
-use super::super::pb;
-use crate::domain::token::model::Token;
-use crate::domain::token::Resolver;
-use common::infra::{Args, Command};
+use crate::domain::token::model::{Token, TokenKind};
+use crate::domain::token::TokenResolver;
+use common::infra::Command;
 use common::invalid_argument;
-use tonic::Status;
+use common::status::ext::GrpcResult;
+use proto::pb::auth::token::v1 as pb;
+use tracing::{instrument, trace};
 
-impl Args for pb::RefreshTokenReq {
-    type Output = Result<pb::RefreshTokenRes, Status>;
-}
-
+#[instrument(skip_all, err)]
 async fn execute(
     req: pb::RefreshTokenReq,
     key: &jsonwebtoken::DecodingKey,
     algorithm: jsonwebtoken::Algorithm,
     generate_token: impl Command<pb::GenerateTokenReq>,
-) -> Result<pb::RefreshTokenRes, Status> {
-    let refresh_token = req.refresh.expect("token must be not none");
-    let token = Token::from_pb(refresh_token)?;
-    if token.is_expired() {
-        return Err(invalid_argument!("refresh", "not expired token"));
+) -> GrpcResult<pb::RefreshTokenRes> {
+    let refresh_token = req.value.as_str();
+    let token: Token = refresh_token.parse()?;
+    trace!("Validating refresh token...");
+    if token.kind() == TokenKind::Access {
+        return Err(invalid_argument!("refresh", "refresh token kind").into());
     }
-    if token.validate(key, algorithm)? {
-        return Err(invalid_argument!("refresh"));
+    if token.is_expired() {
+        return Err(invalid_argument!("refresh", "not expired token").into());
+    }
+    if !token.validate(key, algorithm)? {
+        return Err(invalid_argument!("refresh", "valid signature").into());
     }
 
-    // generate new pair
+    trace!("Refresh new token pair");
     generate_token
         .execute(pb::GenerateTokenReq {
             sub: token.claim().as_sub().to_string(),
@@ -39,7 +41,7 @@ async fn execute(
         })
 }
 
-impl Resolver {
+impl TokenResolver {
     pub fn create_refresh_token(&self) -> impl Command<pb::RefreshTokenReq> + '_ {
         move |req: pb::RefreshTokenReq| async move {
             let generate_token = self.create_generate_token();

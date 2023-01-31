@@ -1,19 +1,21 @@
 use super::Token;
 use crate::domain::token::model::LEE_WAY;
 use crate::domain::token::RedisStore;
-use common::infra::{Command, GetFrom, Query, SetInto};
-use common::*;
+use common::infra::{Command, Del, Get, Query, Set};
+use common::internal;
+use common::status::ext::GrpcStatus;
+use common::status::prelude::*;
 use redis::AsyncCommands;
 use std::cmp::max;
-use tonic::{async_trait, Status};
+use tonic::async_trait;
 
 #[async_trait]
-impl Query<GetFrom<Option<Self>, Status, RedisStore>> for Token {
+impl Query<Get<Option<Self>, GrpcStatus, RedisStore>> for Token {
     async fn execute(
         &self,
-        input: GetFrom<Option<Self>, Status, RedisStore>,
-    ) -> Result<Option<Self>, Status> {
-        let store = input.src();
+        input: Get<Option<Self>, GrpcStatus, RedisStore>,
+    ) -> GrpcResult<Option<Self>> {
+        let store = input.dst();
         let mut conn = store
             .0
             .get_async_connection()
@@ -25,12 +27,8 @@ impl Query<GetFrom<Option<Self>, Status, RedisStore>> for Token {
             .await
             .map_err(|_| internal!(&format!("Failed to get key: {} value in redis", key)))?;
         if let Some(token_str) = token_str {
-            let token = serde_json::from_str(token_str.as_str()).map_err(|_| {
-                internal!(&format!(
-                    "Failed to deserialize internal type {:?}",
-                    token_str
-                ))
-            })?;
+            let token = serde_json::from_str(token_str.as_str())
+                .map_err(|_| internal!("Failed to deserialize internal type from redis"))?;
             return Ok(Some(token));
         }
         Ok(None)
@@ -38,8 +36,8 @@ impl Query<GetFrom<Option<Self>, Status, RedisStore>> for Token {
 }
 
 #[async_trait]
-impl Command<SetInto<Status, RedisStore>> for Token {
-    async fn execute(self, input: SetInto<Status, RedisStore>) -> Result<(), Status> {
+impl Command<Set<GrpcStatus, RedisStore>> for Token {
+    async fn execute(self, input: Set<GrpcStatus, RedisStore>) -> GrpcResult<()> {
         let store = input.dst();
         let mut conn = store
             .0
@@ -51,15 +49,27 @@ impl Command<SetInto<Status, RedisStore>> for Token {
             .map_err(|_| internal!(&format!("Failed to serialize internal type {:?}", self)))?;
         let now = jsonwebtoken::get_current_timestamp();
         let exp = self.claim.inner().as_exp();
-        let ex = max(exp - now, 2 * LEE_WAY);
-        conn.set_ex(&key, &token_str, (ex - 2 * LEE_WAY) as usize)
+        let ex = max(exp - now, 2 * LEE_WAY) - LEE_WAY;
+        conn.set_ex(&key, &token_str, ex as usize)
             .await
-            .map_err(|_| {
-                internal!(&format!(
-                    "Failed to set key: {} value: {} in redis",
-                    key, token_str
-                ))
-            })?;
+            .map_err(|_| internal!(&format!("Failed to set key {}, ex {} in redis", key, ex)))?;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl Command<Del<GrpcStatus, RedisStore>> for Token {
+    async fn execute(self, input: Del<GrpcStatus, RedisStore>) -> GrpcResult<()> {
+        let store = input.dst();
+        let mut conn = store
+            .0
+            .get_async_connection()
+            .await
+            .map_err(|_| internal!("Get async connection from redis failed"))?;
+        let key = format!("auth:token:{}:{}", self.id, self.claim.kind());
+        conn.del(&key)
+            .await
+            .map_err(|_| internal!(&format!("Failed to del key {}", key)))?;
+        todo!()
     }
 }

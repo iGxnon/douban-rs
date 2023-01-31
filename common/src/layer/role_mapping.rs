@@ -1,33 +1,38 @@
-// Casbin 访问控制中间件
-// 必须在 HttpAuth 层后面 以获取从 HttpAuth 层写入的 sub
-
-use casbin::{CoreApi, Enforcer};
+/// Casbin role mapping layer
+///
+use casbin::CoreApi;
 use futures::future::BoxFuture;
 use http::{Request, Response, StatusCode};
-use std::fmt::Display;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
-use tracing::{event, Level};
+use tracing::error;
 
 #[derive(Clone)]
-pub struct RoleMappingLayer<U> {
-    enforcer: Arc<Enforcer>,
-    _data: PhantomData<U>,
+pub struct RoleMappingLayer<I, E> {
+    enforcer: Arc<E>,
+    _data: PhantomData<I>,
 }
 
-impl<U> RoleMappingLayer<U> {
-    pub fn new(enforcer: Enforcer) -> Self {
+impl<I, E: CoreApi> RoleMappingLayer<I, E> {
+    pub fn new_static(enforcer: E) -> Self {
         Self {
             enforcer: Arc::new(enforcer),
             _data: PhantomData::default(),
         }
     }
+
+    pub fn from_arc(enforcer: Arc<E>) -> Self {
+        Self {
+            enforcer,
+            _data: PhantomData::default(),
+        }
+    }
 }
 
-impl<S, U> Layer<S> for RoleMappingLayer<U> {
-    type Service = RoleMapping<S, U>;
+impl<S, I, E> Layer<S> for RoleMappingLayer<I, E> {
+    type Service = RoleMapping<S, I, E>;
 
     fn layer(&self, inner: S) -> Self::Service {
         RoleMapping {
@@ -39,18 +44,19 @@ impl<S, U> Layer<S> for RoleMappingLayer<U> {
 }
 
 #[derive(Clone)]
-pub struct RoleMapping<S, U> {
+pub struct RoleMapping<S, I, E> {
     inner: S,
-    enforcer: Arc<Enforcer>,
-    _data: PhantomData<U>,
+    enforcer: Arc<E>,
+    _data: PhantomData<I>,
 }
 
-impl<S, ReqBody, ResBody, U> Service<Request<ReqBody>> for RoleMapping<S, U>
+impl<S, I, E, ReqBody, ResBody> Service<Request<ReqBody>> for RoleMapping<S, I, E>
 where
     S: Service<Request<ReqBody>, Response = Response<ResBody>> + Send + 'static,
     S::Future: Send + 'static,
     ResBody: Default,
-    U: Display + Send + Sync + 'static,
+    I: AsRef<str> + Send + Sync + 'static,
+    E: CoreApi,
 {
     type Response = S::Response;
     type Error = S::Error;
@@ -63,48 +69,28 @@ where
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         let sub = req
             .extensions()
-            .get::<U>()
-            .map(ToString::to_string)
-            .unwrap_or_else(|| "".to_string());
+            .get::<I>()
+            .map(|sub| sub.as_ref())
+            .unwrap_or("");
         let obj = req.uri().path();
         let act = req.method().as_str();
-        event!(
-            Level::TRACE,
-            target = "layer:role_map",
-            "start to enforce sub({}), obj({}), act({})",
-            sub,
-            obj,
-            act
-        );
-        match self.enforcer.enforce((&*sub, obj, act)) {
+
+        match self.enforcer.enforce((sub, obj, act)) {
             Ok(checked) => {
                 if checked {
                     let fut = self.inner.call(req);
                     Box::pin(async move { fut.await })
                 } else {
-                    event!(
-                        Level::INFO,
-                        target = "layer:role_map",
-                        "enforce sub({}), obj({}), act({}) failed, no authorized!",
-                        sub,
-                        obj,
-                        act
-                    );
                     Box::pin(async move {
                         Ok(Response::builder()
-                            .status(StatusCode::UNAUTHORIZED)
+                            .status(StatusCode::FORBIDDEN)
                             .body(ResBody::default())
                             .unwrap())
                     })
                 }
             }
             Err(err) => {
-                event!(
-                    Level::ERROR,
-                    target = "layer:role_map",
-                    "enforcer is working abnormally, err: {:?}",
-                    err
-                );
+                error!("enforcer is working abnormally, err: {:?}", err);
                 Box::pin(async move {
                     Ok(Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)

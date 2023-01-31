@@ -1,18 +1,18 @@
-use super::super::pb;
 use crate::domain::token::model::Token;
-use crate::domain::token::Resolver;
-use common::infra::{Args, Query};
-use tonic::Status;
+use crate::domain::token::TokenResolver;
+use common::infra::Query;
+use common::status::ext::GrpcResult;
+use proto::pb::auth::token::v1 as pb;
+use tracing::instrument;
+use tracing::log::trace;
 
-impl Args for pb::ParseTokenReq {
-    type Output = Result<pb::ParseTokenRes, Status>;
-}
-
+#[instrument(skip_all, err)]
 async fn execute(
     req: pb::ParseTokenReq,
     key: &jsonwebtoken::DecodingKey,
     algorithm: jsonwebtoken::Algorithm,
-) -> Result<pb::ParseTokenRes, Status> {
+) -> GrpcResult<pb::ParseTokenRes> {
+    trace!("Parsing token...");
     let token: Token = req.value.as_str().parse()?;
     let checked = token.validate(key, algorithm)?;
     let kind: pb::TokenKind = token.kind().into();
@@ -24,7 +24,7 @@ async fn execute(
     })
 }
 
-impl Resolver {
+impl TokenResolver {
     pub fn create_parse_token(&self) -> impl Query<pb::ParseTokenReq> + '_ {
         move |req: pb::ParseTokenReq| async move {
             execute(req, &self.decode_key(), self.algorithm()).await

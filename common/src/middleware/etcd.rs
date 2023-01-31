@@ -1,3 +1,4 @@
+use crate::config::env::optional;
 use crate::middleware::Middleware;
 use async_trait::async_trait;
 use etcd_client::ConnectOptions;
@@ -16,8 +17,7 @@ pub struct EtcdConf {
 
 impl Default for EtcdConf {
     fn default() -> Self {
-        let endpoints: Vec<String> = std::env::var("ETCD_ENDPOINTS")
-            .unwrap_or_else(|_| "127.0.0.1:2379".to_string())
+        let endpoints: Vec<String> = optional("ETCD_ENDPOINTS", "127.0.0.1:2379")
             .split('|')
             .map(ToOwned::to_owned)
             .collect();

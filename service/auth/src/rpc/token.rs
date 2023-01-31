@@ -1,16 +1,13 @@
-use crate::domain::token::pb::{
-    GenerateTokenReq, GenerateTokenRes, ParseTokenReq, ParseTokenRes, RefreshTokenReq,
-    RefreshTokenRes,
-};
-use crate::domain::token::{pb, Resolver};
+use crate::domain::token::TokenResolver;
 use common::infra::*;
+use proto::pb::auth::token::v1::*;
 use tonic::{async_trait, Request, Response, Status};
 
 #[derive(Clone)]
-pub struct TokenService(pub Resolver);
+pub struct TokenService(pub TokenResolver);
 
 #[async_trait]
-impl pb::token_service_server::TokenService for TokenService {
+impl token_service_server::TokenService for TokenService {
     async fn generate_token(
         &self,
         req: Request<GenerateTokenReq>,
@@ -35,6 +32,15 @@ impl pb::token_service_server::TokenService for TokenService {
     ) -> Result<Response<RefreshTokenRes>, Status> {
         let refresh_token = self.0.create_refresh_token();
         let res = refresh_token.execute(req.into_inner()).await?;
+        Ok(Response::new(res))
+    }
+
+    async fn clear_cache(
+        &self,
+        req: Request<ClearCacheReq>,
+    ) -> Result<Response<ClearCacheRes>, Status> {
+        let clear_cache = self.0.create_clear_cache();
+        let res = clear_cache.execute(req.into_inner()).await?;
         Ok(Response::new(res))
     }
 }

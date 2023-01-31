@@ -1,3 +1,4 @@
+use crate::config::env::optional;
 use crate::middleware::Middleware;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ pub struct RedisConf {
 impl Default for RedisConf {
     fn default() -> Self {
         Self {
-            dsn: "redis://127.0.0.1/".to_string(),
+            dsn: optional("APP_REDIS", "redis://127.0.0.1/"),
         }
     }
 }

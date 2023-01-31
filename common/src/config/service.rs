@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub trait ServiceConfig {
     type ApiService: ConfigType;
     type GrpcService: ConfigType;
+    type Service: ConfigType;
 }
 
 fn random_name() -> String {
@@ -16,7 +17,6 @@ fn random_name() -> String {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
 pub struct ServiceConf {
-    pub domain: String,
     pub name: String,
     pub listen_addr: String,
     pub discover_addr: String,
@@ -28,16 +28,12 @@ pub struct ServiceConf {
 impl Default for ServiceConf {
     fn default() -> Self {
         let name = optional("SERVICE_NAME", random_name());
-        let domain = optional("SERVICE_DOMAIN", "sys"); // default domain is `sys`
-        let discover_addr = optional(
-            "DISCOVER_ADDR",
-            format!("{}_{}:3000", domain.as_str(), name.as_str()),
-        );
+        let listen_addr = optional("LISTEN_ADDR", "0.0.0.0:3000");
+        let discover_addr = optional("DISCOVER_ADDR", "http://127.0.0.1:3000");
         Self {
-            discover_addr,
-            domain,
             name,
-            listen_addr: optional("LISTEN_ADDR", "0.0.0.0:3000"),
+            listen_addr,
+            discover_addr,
             timeout: 30,
             concurrency_limit: 5120,
             load_shed: false,
@@ -63,4 +59,5 @@ pub struct GrpcServiceConf {
 impl ServiceConfig for Config {
     type ApiService = ApiServiceConf;
     type GrpcService = GrpcServiceConf;
+    type Service = ServiceConf;
 }

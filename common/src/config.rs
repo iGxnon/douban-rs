@@ -43,17 +43,6 @@ pub mod env {
         })
     }
 
-    pub fn optional_sensitive(env_key: impl AsRef<str>, default: impl ToString) -> String {
-        std::env::var(env_key.as_ref()).unwrap_or_else(|_| {
-            let ret = default.to_string();
-            info!(
-                "cannot found environment {}, use default value",
-                env_key.as_ref(),
-            );
-            ret
-        })
-    }
-
     pub fn optional_some(env_key: impl AsRef<str>) -> Option<String> {
         std::env::var(env_key.as_ref()).ok().or({
             info!(

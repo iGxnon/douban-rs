@@ -1,10 +1,10 @@
-use crate::domain::token::pb::token_service_server::TokenServiceServer;
 use crate::rpc::token::TokenService;
 use base64::Engine;
-use common::config::env::optional_sensitive;
 use common::config::{middleware::MiddlewareConfig, register, service::ServiceConfig, Config};
 use common::discover::{EtcdDiscover, EtcdDiscoverConf};
+use common::infra::{Resolver, Target};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey};
+use proto::pb::auth::token::v1::token_service_server::TokenServiceServer;
 use rand::random;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,11 +19,7 @@ pub mod command;
 pub mod model;
 pub mod query;
 
-pub mod pb {
-    tonic::include_proto!("douban.auth.token");
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(in crate::domain) struct RedisStore(redis::Client);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -48,7 +44,7 @@ impl Default for TokenConfig {
             service_conf: Default::default(),
             redis: Default::default(),
             etcd: Default::default(),
-            oct_key: optional_sensitive("APP_ENCODE_KEY", random_oct_key()),
+            oct_key: random_oct_key(),
             refresh_ratio: 3.0,
             expires: Default::default(),
         }
@@ -58,14 +54,24 @@ impl Default for TokenConfig {
 type Register<T> = register::Register<TokenConfig, T>;
 
 #[derive(Clone)]
-pub struct Resolver {
+pub struct TokenResolver {
     conf: TokenConfig,
     encode_key: Register<EncodingKey>,
     decode_key: Register<DecodingKey>,
     redis: Register<RedisStore>,
 }
 
-impl Resolver {
+impl Resolver for TokenResolver {
+    const TARGET: Target = Target::GRPC;
+    const DOMAIN: &'static str = "token";
+    type Config = TokenConfig;
+
+    fn conf(&self) -> &Self::Config {
+        &self.conf
+    }
+}
+
+impl TokenResolver {
     pub fn new(conf: TokenConfig) -> Self {
         Self {
             conf,
@@ -81,6 +87,10 @@ impl Resolver {
                 )
             }),
         }
+    }
+
+    pub fn add_expire(&mut self, audience: impl Into<String>, expire: u64) {
+        self.conf.expires.insert(audience.into(), expire);
     }
 
     pub fn make_discover(&self) -> EtcdDiscover {
@@ -126,10 +136,6 @@ impl Resolver {
             .add_service(TokenServiceServer::new(token_srv));
 
         serve.serve(addr)
-    }
-
-    fn resolve<T>(&self, register: &Register<T>) -> T {
-        register.register(&self.conf)
     }
 
     pub(in crate::domain) fn decode_key(&self) -> DecodingKey {

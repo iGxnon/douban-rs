@@ -11,18 +11,17 @@
 use async_trait::async_trait;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 pub trait Args {
     type Output;
 }
 
-pub struct GetFrom<T, E, D> {
+pub struct Get<T, E, D> {
     from: D,
     _data: (PhantomData<T>, PhantomData<E>),
 }
 
-impl<T, E, D> GetFrom<T, E, D> {
+impl<T, E, D> Get<T, E, D> {
     pub fn new(from: D) -> Self {
         Self {
             from,
@@ -30,21 +29,21 @@ impl<T, E, D> GetFrom<T, E, D> {
         }
     }
 
-    pub fn src(&self) -> &D {
+    pub fn dst(&self) -> &D {
         &self.from
     }
 }
 
-impl<T, E, D> Args for GetFrom<T, E, D> {
+impl<T, E, D> Args for Get<T, E, D> {
     type Output = Result<T, E>;
 }
 
-pub struct SetInto<E, D> {
+pub struct Set<E, D> {
     into: D,
     _data: PhantomData<E>,
 }
 
-impl<E, D> SetInto<E, D> {
+impl<E, D> Set<E, D> {
     pub fn new(into: D) -> Self {
         Self {
             into,
@@ -57,7 +56,51 @@ impl<E, D> SetInto<E, D> {
     }
 }
 
-impl<E, D> Args for SetInto<E, D> {
+impl<E, D> Args for Set<E, D> {
+    type Output = Result<(), E>;
+}
+
+pub struct Del<E, D> {
+    dst: D,
+    _data: PhantomData<E>,
+}
+
+impl<E, D> Del<E, D> {
+    pub fn new(dst: D) -> Self {
+        Self {
+            dst,
+            _data: Default::default(),
+        }
+    }
+
+    pub fn dst(&self) -> &D {
+        &self.dst
+    }
+}
+
+impl<E, D> Args for Del<E, D> {
+    type Output = Result<(), E>;
+}
+
+pub struct Update<E, D> {
+    dst: D,
+    _data: PhantomData<E>,
+}
+
+impl<E, D> Update<E, D> {
+    pub fn new(dst: D) -> Self {
+        Self {
+            dst,
+            _data: Default::default(),
+        }
+    }
+
+    pub fn dst(&self) -> &D {
+        &self.dst
+    }
+}
+
+impl<E, D> Args for Update<E, D> {
     type Output = Result<(), E>;
 }
 

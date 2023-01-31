@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package douban.auth.token;
+package auth.token.v1;
 
 enum TokenKind {
-  Access = 0;
-  Refresh = 1;
+  ACCESS = 0;
+  REFRESH = 1;
 }
 
 message Token {
@@ -13,8 +13,9 @@ message Token {
 }
 
 message Payload {
-  string group = 1;
-  string extra = 2;
+  string sub = 1;
+  string group = 2;
+  string extra = 3;
 }
 
 message GenerateTokenReq {
@@ -41,7 +42,7 @@ message ParseTokenRes {
 }
 
 message RefreshTokenReq {
-  Token refresh = 1;
+  string value = 1;
 }
 
 message RefreshTokenRes {
@@ -49,8 +50,15 @@ message RefreshTokenRes {
   Token refresh = 2;
 }
 
+message ClearCacheReq {
+  string sub = 1;
+}
+
+message ClearCacheRes {}
+
 service TokenService {
   rpc GenerateToken(GenerateTokenReq) returns (GenerateTokenRes) {}
   rpc ParseToken(ParseTokenReq) returns (ParseTokenRes) {}
   rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenRes) {}
+  rpc ClearCache(ClearCacheReq) returns (ClearCacheRes) {}
 }
