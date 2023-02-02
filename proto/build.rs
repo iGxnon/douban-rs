@@ -6,7 +6,11 @@ const DERIVE_DER: &str = "#[derive(serde::Deserialize)]";
 const DERIVE_DEFAULT: &str = "#[serde(default)]";
 
 fn main() {
-    let protos = ["auth/token/v1/token.proto"];
+    let protos: Vec<_> = glob::glob("**/*.proto")
+        .unwrap()
+        .flat_map(Result::ok)
+        .collect();
+    // let protos = ["auth/token/v1/token.proto", "user/sys/v1/sys.proto"];
     let proto_dir: &Path = ".".as_ref();
 
     tonic_build::configure()

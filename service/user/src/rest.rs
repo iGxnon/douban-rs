@@ -21,7 +21,7 @@ pub struct RestConfig {
     pub service_conf: <Config as ServiceConfig>::ApiService,
 }
 
-type Register<T> = register::Register<Config, T>;
+type Register<T> = register::Register<RestConfig, T>;
 
 #[derive(Debug, Clone)]
 pub struct RestResolver {

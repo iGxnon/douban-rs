@@ -8,6 +8,8 @@
 // The difference in receivers means commands can call queries
 // but queries can't call commands.
 
+pub mod args;
+
 use async_trait::async_trait;
 use std::future::Future;
 use std::marker::PhantomData;

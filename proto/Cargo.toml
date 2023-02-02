@@ -15,3 +15,6 @@ serde = {version = "1.0", features = ["derive"] }
 [build-dependencies.tonic-build]
 version = "0.8.4"
 
+[build-dependencies.glob]
+version = "0.3.1"
+
