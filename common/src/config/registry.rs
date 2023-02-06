@@ -6,6 +6,6 @@ pub trait DiscoverConfig {
 }
 
 impl DiscoverConfig for Config {
-    type Etcd = crate::discover::EtcdDiscoverConf;
-    type Consul = crate::discover::ConsulDiscoverConf;
+    type Etcd = crate::registry::EtcdRegistryConf;
+    type Consul = crate::registry::ConsulRegistryConf;
 }
