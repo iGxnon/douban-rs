@@ -27,7 +27,7 @@ async fn execute(
 impl TokenResolver {
     pub fn create_parse_token(&self) -> impl Query<pb::ParseTokenReq> + '_ {
         move |req: pb::ParseTokenReq| async move {
-            execute(req, &self.decode_key(), self.algorithm()).await
+            execute(req, self.decode_key(), self.algorithm()).await
         }
     }
 }

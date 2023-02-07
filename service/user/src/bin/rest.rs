@@ -1,10 +1,18 @@
-use user::rest::{RestConfig, RestResolver};
+use common::infra::Resolver;
+use common::utils::parse_config;
+use user::rest::RestResolver;
 
 #[tokio::main]
 async fn main() {
-    let mut conf = RestConfig::default();
-    conf.service_conf.service.listen_addr = "0.0.0.0:5001".to_string();
+    tracing_subscriber::fmt::init();
+
+    let conf = parse_config(RestResolver::DOMAIN)
+        .await
+        .expect("Cannot parse config");
+
     println!("{}", serde_json::to_string_pretty(&conf).unwrap());
-    let resolver = RestResolver::new(conf);
+
+    let resolver = RestResolver::new(conf).await;
+
     resolver.serve().await;
 }

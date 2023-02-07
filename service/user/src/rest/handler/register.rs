@@ -1,12 +1,15 @@
 use super::*;
 
-async fn execute<'a>() -> HttpResult<'a, ()> {
-    Ok(None)
-}
-
-pub(in crate::rest) async fn handle<'a>(
+pub(in crate::rest) async fn handle(
     State(resolver): State<Arc<RestResolver>>,
-    Form(SharedLoginReq { username, password }): Form<SharedLoginReq>,
-) -> Json<Resp<'a, ()>> {
-    Json(execute::<'a>().await.into())
+    Form(RegisterReq { username, password }): Form<RegisterReq>,
+) -> Json<Resp<()>> {
+    let resp = resolver
+        .user_service()
+        .register(pb::RegisterReq { username, password })
+        .await
+        .map(|_| ())
+        .map_err(HttpStatus::from);
+
+    Json(resp.into())
 }

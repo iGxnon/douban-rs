@@ -10,100 +10,13 @@
 
 pub mod args;
 
+pub use args::*;
+
 use async_trait::async_trait;
 use std::future::Future;
-use std::marker::PhantomData;
 
 pub trait Args {
     type Output;
-}
-
-pub struct Get<T, E, D> {
-    from: D,
-    _data: (PhantomData<T>, PhantomData<E>),
-}
-
-impl<T, E, D> Get<T, E, D> {
-    pub fn new(from: D) -> Self {
-        Self {
-            from,
-            _data: (Default::default(), Default::default()),
-        }
-    }
-
-    pub fn dst(&self) -> &D {
-        &self.from
-    }
-}
-
-impl<T, E, D> Args for Get<T, E, D> {
-    type Output = Result<T, E>;
-}
-
-pub struct Set<E, D> {
-    into: D,
-    _data: PhantomData<E>,
-}
-
-impl<E, D> Set<E, D> {
-    pub fn new(into: D) -> Self {
-        Self {
-            into,
-            _data: Default::default(),
-        }
-    }
-
-    pub fn dst(&self) -> &D {
-        &self.into
-    }
-}
-
-impl<E, D> Args for Set<E, D> {
-    type Output = Result<(), E>;
-}
-
-pub struct Del<E, D> {
-    dst: D,
-    _data: PhantomData<E>,
-}
-
-impl<E, D> Del<E, D> {
-    pub fn new(dst: D) -> Self {
-        Self {
-            dst,
-            _data: Default::default(),
-        }
-    }
-
-    pub fn dst(&self) -> &D {
-        &self.dst
-    }
-}
-
-impl<E, D> Args for Del<E, D> {
-    type Output = Result<(), E>;
-}
-
-pub struct Update<E, D> {
-    dst: D,
-    _data: PhantomData<E>,
-}
-
-impl<E, D> Update<E, D> {
-    pub fn new(dst: D) -> Self {
-        Self {
-            dst,
-            _data: Default::default(),
-        }
-    }
-
-    pub fn dst(&self) -> &D {
-        &self.dst
-    }
-}
-
-impl<E, D> Args for Update<E, D> {
-    type Output = Result<(), E>;
 }
 
 #[async_trait]

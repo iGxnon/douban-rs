@@ -19,6 +19,7 @@ fn main() {
             "auth.token.v1.Payload",
             vec![DERIVE_SER_DER, DERIVE_DEFAULT],
         )
+        .derive_for("user.sys.v1.LoginRes", vec![DERIVE_SER_DER, DERIVE_DEFAULT])
         .out_dir("src/gen")
         .compile(&protos, &[proto_dir])
         .unwrap();

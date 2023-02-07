@@ -1,5 +1,5 @@
 use crate::domain::token::model::{Claim, Payload, Token, TokenId, TokenKind};
-use crate::domain::token::{RedisStore, TokenResolver};
+use crate::domain::token::TokenResolver;
 use common::infra::*;
 use common::invalid_argument;
 use common::status::ext::GrpcResult;
@@ -14,7 +14,7 @@ async fn execute(
     service_domain: &str,
     encode_key: &EncodingKey,
     algorithm: Algorithm,
-    store: RedisStore,
+    store: &'static redis::Client,
     refresh_ratio: f32,
     expires: &HashMap<String, u64>,
 ) -> GrpcResult<pb::GenerateTokenRes> {
@@ -22,12 +22,12 @@ async fn execute(
     trace!("Checking tokens if they are cached...");
     let cached_access = Query::execute(
         &Token::with(token_id.clone(), TokenKind::Access),
-        Get::new(store.clone()),
+        RedisGet::new(store),
     )
     .await?;
     let cached_refresh = Query::execute(
         &Token::with(token_id.clone(), TokenKind::Refresh),
-        Get::new(store.clone()),
+        RedisGet::new(store),
     )
     .await?;
 
@@ -81,8 +81,8 @@ async fn execute(
     let _ = refresh_token.sign(encode_key, algorithm)?;
 
     trace!("Save tokens into cache");
-    Command::execute(access_token.clone(), Set::new(store.clone())).await?;
-    Command::execute(refresh_token.clone(), Set::new(store.clone())).await?;
+    Command::execute(access_token.clone(), RedisSet::new(store)).await?;
+    Command::execute(refresh_token.clone(), RedisSet::new(store)).await?;
 
     Ok(pb::GenerateTokenRes {
         access: Some(access_token.to_pb_exact()),
@@ -96,7 +96,7 @@ impl TokenResolver {
             execute(
                 req,
                 Self::DOMAIN,
-                &self.encode_key(),
+                self.encode_key(),
                 self.algorithm(),
                 self.redis_store(),
                 self.conf.refresh_ratio,

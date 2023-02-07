@@ -2,7 +2,6 @@ use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tracing::info;
 
-pub mod discover;
 pub mod layer;
 pub mod middleware;
 pub mod service;
@@ -74,6 +73,17 @@ pub mod register {
             }))
         }
 
+        // Use Box::leak to create a 'static lifetime register
+        pub fn once_ref(f: impl Fn(&C) -> T + Send + Sync + 'static) -> Register<C, &'static T>
+        where
+            T: Sync + 'static,
+        {
+            let cell = OnceCell::new();
+            Register(Arc::new(move |resolver| {
+                cell.get_or_init(|| Box::leak(Box::new(f(resolver))) as &'static T)
+            }))
+        }
+
         // Create a register that returns a new instance of a value each time.
         pub fn factory(f: impl Fn(&C) -> T + Send + Sync + 'static) -> Self {
             Register(Arc::new(f))
@@ -85,7 +95,80 @@ pub mod register {
     }
 }
 
+#[macro_export]
+macro_rules! define_conf {
+    (
+        $(#[derive($($der:ident),+)])?
+        $vis:vis struct $conf:ident {
+            $(
+                $(#($de:ident))?
+                $(#[$dname:ident = $b:block, $iname:literal])?
+                $fvis:vis $fname:ident: $typ:ty,
+            )*
+        }
+    ) => {
+        #[derive(Clone, serde::Deserialize, $($($der),+)?)]
+        $vis struct $conf {
+            $(
+                $(#[serde(default = $iname)])?
+                $(#[serde($de)])?
+                $fvis $fname: $typ
+            ),*
+        }
+
+        $(
+            $(fn $dname() -> $typ $b)?
+        )*
+
+        impl Default for $conf {
+            fn default() -> Self {
+                Self {
+                    $(
+                        $($fname: Default::$de(),)?
+                        $($fname: $dname(),)?
+                    )*
+                }
+            }
+        }
+    };
+    (
+        $(#[derive($($der:ident),+)])?
+        $vis:vis struct $conf:ident {
+            $(
+                $(#($de:ident))?
+                $(#[$dname:ident = $e:expr, $iname:literal])?
+                $fvis:vis $fname:ident: $typ:ty,
+            )*
+        }
+    ) => {
+        #[derive(Clone, serde::Deserialize, $($($der),+)?)]
+        $vis struct $conf {
+            $(
+                $(#[serde(default = $iname)])?
+                $(#[serde($de)])?
+                $fvis $fname: $typ
+            ),*
+        }
+
+        $(
+            $(fn $dname() -> $typ { $e })?
+        )*
+
+        impl Default for $conf {
+            fn default() -> Self {
+                Self {
+                    $(
+                        $($fname: Default::$de(),)?
+                        $($fname: $dname(),)?
+                    )*
+                }
+            }
+        }
+    };
+}
+
 #[cfg(test)]
+#[allow(dead_code)]
 mod test {
     use super::middleware::MiddlewareConfig;
     use super::register::Register;
@@ -93,28 +176,19 @@ mod test {
     use super::Config;
     use base64::Engine;
     use rand::random;
-    use serde::{Deserialize, Serialize};
 
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    #[serde(default)]
-    struct MyConfig {
-        service_conf: <Config as ServiceConfig>::GrpcService,
-        redis: <Config as MiddlewareConfig>::Redis,
-        encode_key: String,
-    }
-
-    impl Default for MyConfig {
-        fn default() -> Self {
-            fn random_oct_key() -> String {
+    define_conf! {
+        #[derive(Debug)]
+        struct MyConfig {
+            #(default)
+            service_conf: <Config as ServiceConfig>::GrpcService,
+            #(default)
+            redis: <Config as MiddlewareConfig>::Redis,
+            #[default_key = {
                 let bytes: [u8; 32] = random();
                 base64::prelude::BASE64_STANDARD.encode(bytes)
-            }
-
-            Self {
-                service_conf: Default::default(),
-                redis: Default::default(),
-                encode_key: random_oct_key(),
-            }
+            }, "default_key"]
+            encode_key: String,
         }
     }
 
@@ -145,10 +219,6 @@ mod test {
         fn redis(&self) -> redis::Client {
             self.redis.register(&self.conf)
         }
-
-        fn encode_key(&self) -> Box<jsonwebtoken::EncodingKey> {
-            self.encode_key.register(&self.conf)
-        }
     }
 
     #[test]
@@ -156,11 +226,13 @@ mod test {
         // Minimal configuration requires no configuration!
         let conf: MyConfig = serde_json::from_str("{}").unwrap();
         println!("{:?}", conf);
+        let dsn_ref = MyRegister::once_ref(|conf| conf.redis.dsn.to_string());
+        let dsn = dsn_ref.register(&conf) as &'static String;
+        println!("{}", dsn);
 
         let resolver = Resolver::new(conf);
 
         let client = resolver.redis();
-        let encode_key = resolver.encode_key();
         println!("{:?}", client);
     }
 }

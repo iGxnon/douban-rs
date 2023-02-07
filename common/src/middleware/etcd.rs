@@ -5,13 +5,19 @@ use etcd_client::ConnectOptions;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
+fn default_keep_alive_while_idle() -> bool {
+    true
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(default)]
 pub struct EtcdConf {
+    #[serde(default)]
     pub endpoints: Vec<String>,
     /// user is a pair values of name and password
+    #[serde(default)]
     pub user: Option<(String, String)>,
     /// Whether send keep alive pings even there are no active streams.
+    #[serde(default = "default_keep_alive_while_idle")]
     pub keep_alive_while_idle: bool,
 }
 
@@ -25,7 +31,7 @@ impl Default for EtcdConf {
         Self {
             endpoints,
             user: None,
-            keep_alive_while_idle: true,
+            keep_alive_while_idle: default_keep_alive_while_idle(),
         }
     }
 }

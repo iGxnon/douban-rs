@@ -3,17 +3,19 @@ use crate::middleware::Middleware;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+fn default_dsn() -> String {
+    optional("APP_REDIS", "redis://127.0.0.1/")
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(default)]
 pub struct RedisConf {
+    #[serde(default = "default_dsn")]
     pub dsn: String,
 }
 
 impl Default for RedisConf {
     fn default() -> Self {
-        Self {
-            dsn: optional("APP_REDIS", "redis://127.0.0.1/"),
-        }
+        Self { dsn: default_dsn() }
     }
 }
 

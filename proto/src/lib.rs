@@ -20,7 +20,14 @@ macro_rules! include_proto {
 
 pub mod pb {
     include_proto!(auth, token, v1);
-    include_proto!(user, sys, v1);
+    // include_proto!(user, sys, v1);
+    pub mod user {
+        pub mod sys {
+            pub mod v1 {
+                include!("./gen/user.sys.v1.rs");
+            }
+        }
+    }
 }
 
 macro_rules! impl_args {

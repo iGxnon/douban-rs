@@ -1,24 +1,20 @@
-use auth::domain::token::{TokenConfig, TokenResolver};
-use common::discover::Discover;
+use auth::domain::token::TokenResolver;
+use common::infra::Resolver;
+use common::utils::parse_config;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let config = TokenConfig::default();
+    let config = parse_config(TokenResolver::DOMAIN)
+        .await
+        .expect("Cannot parse config");
 
     println!("{}", serde_json::to_string_pretty(&config).unwrap());
 
-    let mut resolver = TokenResolver::new(config);
+    let resolver = TokenResolver::new(config);
 
-    resolver.add_expire("auth", 167800);
+    resolver.register_service().await;
 
-    let discover = resolver.make_discover();
-    discover
-        .register_service(&resolver)
-        .await
-        .expect("Cannot register service into etcd");
-
-    let serve = resolver.make_serve().await;
-    serve.await.unwrap();
+    resolver.serve().await.expect("Start failed");
 }

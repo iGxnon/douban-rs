@@ -5,7 +5,7 @@ use tonic::{Request, Response, Status};
 
 use crate::domain::user::UserResolver;
 
-pub struct UserService(UserResolver);
+pub struct UserService(pub(crate) UserResolver);
 
 #[tonic::async_trait]
 impl user_service_server::UserService for UserService {

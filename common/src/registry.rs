@@ -12,84 +12,104 @@ use tokio::sync::mpsc::Sender;
 use tonic::transport::Endpoint;
 use tower::discover::Change;
 
-pub trait DomainProvider: Send + Sync {
-    fn domain(&self) -> &str;
-}
-
-impl<T> DomainProvider for &T
-where
-    T: Resolver + Send + Sync,
-{
-    fn domain(&self) -> &str {
-        T::DOMAIN
-    }
-}
-
-impl DomainProvider for &str {
-    fn domain(&self) -> &str {
-        self
-    }
-}
-
-impl DomainProvider for String {
-    fn domain(&self) -> &str {
-        self
-    }
-}
-
+/// Domain must be a static str and immutable across runtime.
+/// see [Resolver::DOMAIN]
 #[async_trait]
-pub trait Discover<K>
+pub trait ServiceRegister<K>
 where
     K: Hash + Eq + Send + Clone + 'static,
 {
     type Error;
 
-    async fn register_service<R: DomainProvider>(
-        &self,
-        domain_provider: R,
-    ) -> Result<(), Self::Error>;
+    async fn register_service(&self, domain: &'static str) -> Result<(), Self::Error>;
+}
 
-    async fn discover_to_channel<R: DomainProvider>(
+#[async_trait]
+pub trait ServiceDiscover<K>
+where
+    K: Hash + Eq + Send + Clone + 'static,
+{
+    type Error;
+
+    async fn discover_to_channel(
         &self,
-        domain_provider: R,
+        domain: &'static str,
         tx: Sender<Change<K, Endpoint>>,
     ) -> Result<(), Self::Error>;
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(default)]
-pub struct EtcdDiscoverConf {
-    pub etcd: EtcdConf,
-    pub service: ServiceConf,
-    pub grant_ttl: i64,
-    pub keep_alive_interval: u64,
+// The combination of discovery and registration services.
+// It is not suitable for use in a custom configuration, so
+// it does not derive serde traits.
+#[derive(Clone, Debug)]
+pub enum EtcdRegistryOption {
+    Register {
+        etcd: EtcdConf,
+        service: ServiceConf,
+        grant_ttl: i64,
+        keep_alive_interval: u64,
+    },
+    Discover {
+        etcd: EtcdConf,
+    },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-#[serde(default)]
-pub struct ConsulDiscoverConf {
-    pub consul: ConsulConf,
-    pub service: ServiceConf,
-}
+impl EtcdRegistryOption {
+    pub fn discover(etcd: EtcdConf) -> Self {
+        Self::Discover { etcd }
+    }
 
-impl EtcdDiscoverConf {
-    pub fn new(etcd: EtcdConf, service: ServiceConf) -> Self {
-        Self {
+    pub fn register(etcd: EtcdConf, service: ServiceConf) -> Self {
+        Self::Register {
             etcd,
             service,
             grant_ttl: 61,
             keep_alive_interval: 20,
         }
     }
+
+    pub fn grant_ttl(mut self, ttl: i64) -> Self {
+        if let EtcdRegistryOption::Register { grant_ttl, .. } = &mut self {
+            *grant_ttl = ttl;
+        }
+        self
+    }
+
+    pub fn keep_alive_interval(mut self, kai: u64) -> Self {
+        if let EtcdRegistryOption::Register {
+            keep_alive_interval,
+            ..
+        } = &mut self
+        {
+            *keep_alive_interval = kai;
+        }
+        self
+    }
 }
 
-impl Default for EtcdDiscoverConf {
+impl Default for EtcdRegistryOption {
     fn default() -> Self {
-        Self {
+        Self::Discover {
             etcd: Default::default(),
-            service: Default::default(),
-            grant_ttl: 61,
-            keep_alive_interval: 20,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum ConsulRegistryOption {
+    Register {
+        consul: ConsulConf,
+        service: ServiceConf,
+    },
+    Discover {
+        consul: ConsulConf,
+    },
+}
+
+impl Default for ConsulRegistryOption {
+    fn default() -> Self {
+        Self::Discover {
+            consul: Default::default(),
         }
     }
 }

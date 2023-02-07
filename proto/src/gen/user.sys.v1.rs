@@ -6,6 +6,8 @@ pub struct LoginReq {
     #[prost(string, tag = "2")]
     pub password: ::prost::alloc::string::String,
 }
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LoginRes {

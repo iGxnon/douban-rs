@@ -3,16 +3,19 @@ pub mod rpc;
 
 pub mod layer {
     use crate::domain::token::TokenResolver;
-    use common::discover::{Discover, EtcdDiscover, EtcdDiscoverConf};
     use common::infra::Resolver;
     use common::layer::{AsyncAuth, CookieAuthConf, DEFAULT_COOKIE_NAME};
+    use common::middleware::etcd::EtcdConf;
+    use common::registry::{EtcdRegistry, ServiceDiscover};
     use cookie::Key;
+    use futures::future::BoxFuture;
     use http::{HeaderMap, Request, Response};
     use once_cell::sync::OnceCell;
     use proto::pb::auth::token::v1::token_service_client::TokenServiceClient;
     use serde::{Deserialize, Serialize};
     use std::future::Future;
     use std::marker::PhantomData;
+    use std::sync::Arc;
     use tonic::transport::Channel;
 
     static CLIENT: OnceCell<TokenServiceClient<Channel>> = OnceCell::new();
@@ -20,12 +23,19 @@ pub mod layer {
 
     const DEFAULT_REALM: &str = "app-http-auth";
 
+    fn default_etcd() -> Option<EtcdConf> {
+        Some(EtcdConf::default())
+    }
+
     #[derive(Deserialize, Serialize, Clone, Debug)]
-    #[serde(default)]
     pub struct AuthConf {
-        pub auth_discover: EtcdDiscoverConf,
+        #[serde(default = "default_etcd")]
+        pub etcd: Option<EtcdConf>,
+        #[serde(default)]
         pub cookie_conf: Option<CookieAuthConf>,
-        pub auth_header: String,
+        #[serde(default)]
+        pub bearer_header: Option<String>,
+        #[serde(default)]
         pub www_auth: WWWAuth,
     }
 
@@ -41,9 +51,9 @@ pub mod layer {
     impl Default for AuthConf {
         fn default() -> Self {
             Self {
-                auth_discover: Default::default(),
+                etcd: default_etcd(),
                 cookie_conf: Some(CookieAuthConf::default()),
-                auth_header: http::header::AUTHORIZATION.to_string(),
+                bearer_header: Some(http::header::AUTHORIZATION.to_string()),
                 www_auth: Default::default(),
             }
         }
@@ -51,22 +61,28 @@ pub mod layer {
 
     /// Used for generating unauthorized header [WWW_AUTH_BASIC], [WWW_AUTH_BEARER], [WWW_AUTH_COOKIE]
     #[derive(Deserialize, Serialize, Clone, Debug)]
-    #[serde(default)]
     pub struct WWWAuth {
-        basic: String,
-        bearer: String,
-        cookie: String,
+        #[serde(default)]
+        bearer: Option<String>,
+        #[serde(default)]
+        cookie: Option<String>,
     }
 
     impl WWWAuth {
-        pub fn new(realm: &str, cookie_name: &str) -> Self {
+        pub fn bearer(realm: &str) -> Self {
             Self {
-                basic: format!(r#"Basic realm={},charset=UTF-8"#, realm),
-                bearer: format!(r#"Bearer realm={},charset=UTF-8"#, realm),
-                cookie: format!(
+                bearer: Some(format!(r#"Bearer realm={},charset=UTF-8"#, realm)),
+                cookie: None,
+            }
+        }
+
+        pub fn cookie(realm: &str, cookie_name: &str) -> Self {
+            Self {
+                bearer: None,
+                cookie: Some(format!(
                     r#"Cookie realm={},charset=UTF-8,cookie-name={}"#,
                     realm, cookie_name
-                ),
+                )),
             }
         }
     }
@@ -74,26 +90,25 @@ pub mod layer {
     impl Default for WWWAuth {
         fn default() -> Self {
             Self {
-                basic: format!(r#"Basic realm={},charset=UTF-8"#, DEFAULT_REALM),
-                bearer: format!(r#"Bearer realm={},charset=UTF-8"#, DEFAULT_REALM),
-                cookie: format!(
+                bearer: Some(format!(r#"Bearer realm={},charset=UTF-8"#, DEFAULT_REALM)),
+                cookie: Some(format!(
                     r#"Cookie realm={},charset=UTF-8,cookie-name={}"#,
                     DEFAULT_REALM, DEFAULT_COOKIE_NAME,
-                ),
+                )),
             }
         }
     }
 
-    pub struct Auth<I: IdentityProvider, ResBody, F: Clone> {
-        f: F,
+    pub struct Auth<I: IdentityProvider, ResBody> {
+        method: method::Method,
         conf: AuthConf,
         _data: PhantomData<(ResBody, I)>,
     }
 
-    impl<I: IdentityProvider, ResBody, F: Clone> Clone for Auth<I, ResBody, F> {
+    impl<I: IdentityProvider, ResBody> Clone for Auth<I, ResBody> {
         fn clone(&self) -> Self {
             Self {
-                f: self.f.clone(),
+                method: self.method.clone(),
                 conf: self.conf.clone(),
                 _data: Default::default(),
             }
@@ -113,10 +128,19 @@ pub mod layer {
         ) -> Self::Fut;
     }
 
-    impl<ResBody, I: IdentityProvider> Auth<I, ResBody, method::Method> {
-        pub async fn cookie(conf: AuthConf) -> Self {
+    impl<ResBody, I: IdentityProvider> Auth<I, ResBody> {
+        pub async fn cookie(mut conf: AuthConf) -> Self {
+            // reduce clone cost
+            conf.www_auth.bearer.take();
+            conf.bearer_header.take();
+            debug_assert!(conf.cookie_conf.is_some());
             Self {
-                f: method::Method::CookieAuth,
+                method: method::Method::CookieAuth(Arc::new(
+                    conf.www_auth
+                        .cookie
+                        .take()
+                        .expect("Require www_auth.cookie to be represented"),
+                )),
                 conf,
                 _data: PhantomData,
             }
@@ -124,9 +148,18 @@ pub mod layer {
             .await
         }
 
-        pub async fn bearer(conf: AuthConf) -> Self {
+        pub async fn bearer(mut conf: AuthConf) -> Self {
+            // reduce clone cost
+            conf.www_auth.cookie.take();
+            conf.cookie_conf.take();
+            debug_assert!(conf.bearer_header.is_some());
             Self {
-                f: method::Method::BearerJwtAuth,
+                method: method::Method::BearerAuth(Arc::new(
+                    conf.www_auth
+                        .bearer
+                        .take()
+                        .expect("Require www_auth.bearer to be represented"),
+                )),
                 conf,
                 _data: PhantomData,
             }
@@ -134,9 +167,9 @@ pub mod layer {
             .await
         }
 
-        async fn connect(self) -> Self {
+        async fn connect(mut self) -> Self {
             let (channel, tx) = Channel::balance_channel(64);
-            let discover = EtcdDiscover::new(self.conf.auth_discover.clone());
+            let discover = EtcdRegistry::discover(self.conf.etcd.take().unwrap());
             discover
                 .discover_to_channel(TokenResolver::DOMAIN, tx)
                 .await
@@ -148,41 +181,44 @@ pub mod layer {
         }
     }
 
-    impl<B, F, ResBody, I> AsyncAuth<B> for Auth<I, ResBody, F>
+    type BoxFut<B, ResBody> =
+        BoxFuture<'static, Result<(Request<B>, Option<HeaderMap>), Response<ResBody>>>;
+
+    impl<B, ResBody, I> AsyncAuth<B> for Auth<I, ResBody>
     where
         B: Send + 'static,
-        F: AuthMethod<B, ResBody, I>,
         I: IdentityProvider,
+        ResBody: Default + Send,
     {
-        type RequestBody = F::ReqBody;
+        type RequestBody = B;
         type ResponseBody = ResBody;
-        type Future = F::Fut;
+        type Future = BoxFut<B, ResBody>;
 
         fn authorize(&mut self, req: Request<B>) -> Self::Future {
-            let method = &self.f;
+            let method = &self.method;
             let client = CLIENT.get().expect("Not connect.").clone();
 
-            method.auth(client, self.conf.clone(), req)
+            method.auth::<I, _, _>(client, self.conf.clone(), req)
         }
     }
 
-    pub mod method {
+    mod method {
         use super::*;
         use common::layer::{scan_cookies, write_cookie};
         use common::status::prelude::*;
         use cookie::time::Duration;
         use cookie::{Cookie, CookieJar};
-        use futures::future::BoxFuture;
         use http::header::HeaderName;
         use http::{header, Request, Response, StatusCode};
         use proto::pb::auth::token::v1 as pb;
+        use std::sync::Arc;
         use tracing::instrument;
         use tracing::log::trace;
 
         #[derive(Clone)]
         pub enum Method {
-            CookieAuth,
-            BearerJwtAuth,
+            CookieAuth(Arc<String>),
+            BearerAuth(Arc<String>),
         }
 
         fn expect_two<I: Iterator>(mut split: I) -> Result<(I::Item, I::Item), StatusCode> {
@@ -387,28 +423,17 @@ pub mod layer {
             }
         }
 
-        impl<B, ResBody, I> AuthMethod<B, ResBody, I> for Method
-        where
-            B: Send + 'static,
-            ResBody: Send + Default,
-            I: IdentityProvider,
-        {
-            type ReqBody = B;
-            type Fut = BoxFuture<
-                'static,
-                Result<(Request<Self::ReqBody>, Option<HeaderMap>), Response<ResBody>>,
-            >;
-
-            fn auth(
+        impl Method {
+            pub(super) fn auth<I: IdentityProvider, B: Send + 'static, ResBody: Default + Send>(
                 &self,
                 client: TokenServiceClient<Channel>,
                 conf: AuthConf,
                 req: Request<B>,
-            ) -> Self::Fut {
+            ) -> BoxFut<B, ResBody> {
                 let method = self.clone();
                 Box::pin(async move {
                     let res = match method {
-                        Method::CookieAuth => Method::cookie_auth::<I, _>(
+                        Method::CookieAuth(_) => Method::cookie_auth::<I, _>(
                             client,
                             conf.cookie_conf.expect("Must configure cookie_conf"),
                             req,
@@ -422,10 +447,11 @@ pub mod layer {
                                 (req, Some(header_map))
                             }
                         }),
-                        Method::BearerJwtAuth => {
+                        Method::BearerAuth(_) => {
                             Method::bearer_auth::<I, _>(
                                 client,
-                                conf.auth_header
+                                conf.bearer_header
+                                    .expect("Must configure bearer_header")
                                     .as_str()
                                     .parse()
                                     .expect("Not a valid bearer http header"),
@@ -437,14 +463,14 @@ pub mod layer {
                     match res {
                         Ok(req) => Ok(req),
                         Err(code) => match method {
-                            Method::CookieAuth => Err(Response::builder()
+                            Method::CookieAuth(www) => Err(Response::builder()
                                 .status(code)
-                                .header(header::WWW_AUTHENTICATE, conf.www_auth.cookie)
+                                .header(header::WWW_AUTHENTICATE, www.as_str())
                                 .body(ResBody::default())
                                 .unwrap()),
-                            Method::BearerJwtAuth => Err(Response::builder()
+                            Method::BearerAuth(www) => Err(Response::builder()
                                 .status(code)
-                                .header(header::WWW_AUTHENTICATE, conf.www_auth.bearer)
+                                .header(header::WWW_AUTHENTICATE, www.as_str())
                                 .body(ResBody::default())
                                 .unwrap()),
                         },

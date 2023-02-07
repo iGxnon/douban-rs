@@ -1,32 +1,33 @@
-use kosei::{ApolloClient, Config, ConfigType};
+use crate::config::env::optional;
+use crate::middleware::apollo::{Apollo, ApolloConf};
+use crate::middleware::Middleware;
+use kosei::Config;
+use std::path::Path;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
 pub async fn parse_config<E: serde::de::DeserializeOwned + Clone>(
-    service_name: &str,
+    domain: &str,
 ) -> Result<E, Error> {
-    let typ = std::env::var("CONFIG_TYPE")?;
+    let typ = optional("CONFIG_TYPE", "file");
     match typ.to_lowercase().as_str() {
         "file" => {
-            let path = std::env::var("CONFIG_PATH")?;
+            let path = optional("CONFIG_PATH", "config");
+            let path: &Path = path.as_ref();
+
+            // parse config from directory with service_domain
+            if path.is_dir() {
+                let path = path.join(format!("{}.{}", domain, optional("CONFIG_FILETYPE", "yml")));
+                return Ok(Config::<E>::from_file(path).into_inner());
+            }
 
             Ok(Config::<E>::from_file(path).into_inner())
         }
         "apollo" => {
-            let appid = std::env::var("APOLLO_APP_ID")?;
-            let cluster_name =
-                std::env::var("APOLLO_CLUSTER_NAME").unwrap_or_else(|_| "default".into());
-            let apollo_addr = std::env::var("APOLLO_ADDR")?;
-            let apollo_secret = std::env::var("APOLLO_SECRET").ok();
+            let apollo = Apollo::new(ApolloConf::default());
+            let client = apollo.make_client().await.unwrap();
 
-            // read config
-            let apollo_client = ApolloClient::new(&apollo_addr)
-                .appid(&appid)
-                .namespace(service_name, ConfigType::YAML)
-                .cluster(&cluster_name)
-                .some_secret(apollo_secret.as_deref());
-
-            Ok(Config::<E>::from_apollo(&apollo_client).await?.into_inner())
+            Ok(Config::<E>::from_apollo(&client).await?.into_inner())
         }
         _ => panic!("unsupported config type"),
     }

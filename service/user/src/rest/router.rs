@@ -20,7 +20,7 @@ impl IdentityProvider for IdProvider {
 
 impl RestResolver {
     pub async fn make_router(&self) -> Router {
-        let auth = Auth::<IdProvider, _, _>::cookie(AuthConf::default()).await;
+        let auth = Auth::<IdProvider, _>::cookie(AuthConf::default()).await;
         let bind_router = Router::new()
             .route("/bind", post(bind::handle))
             .layer(ServiceBuilder::new().layer(AsyncHttpAuthLayer::new(auth)));

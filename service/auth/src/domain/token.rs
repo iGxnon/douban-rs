@@ -1,14 +1,13 @@
 use crate::rpc::token::TokenService;
 use base64::Engine;
 use common::config::{middleware::MiddlewareConfig, register, service::ServiceConfig, Config};
-use common::discover::{EtcdDiscover, EtcdDiscoverConf};
 use common::infra::{Resolver, Target};
+use common::registry::{EtcdRegistry, ServiceRegister};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey};
 use proto::pb::auth::token::v1::token_service_server::TokenServiceServer;
 use rand::random;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::future::Future;
 use std::time::Duration;
 use tonic::transport::Server;
 use tower::load_shed::LoadShedLayer;
@@ -19,46 +18,53 @@ pub mod command;
 pub mod model;
 pub mod query;
 
-#[derive(Clone, Debug)]
-pub(in crate::domain) struct RedisStore(redis::Client);
+fn random_oct_key() -> String {
+    let key: [u8; 32] = random();
+    base64::prelude::BASE64_STANDARD.encode(key)
+}
+
+fn default_refresh_ratio() -> f32 {
+    3.0
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(default)]
 pub struct TokenConfig {
+    #[serde(default)]
     service_conf: <Config as ServiceConfig>::GrpcService,
+    #[serde(default)]
     redis: <Config as MiddlewareConfig>::Redis,
+    #[serde(default)]
     etcd: <Config as MiddlewareConfig>::Etcd,
+    #[serde(default = "random_oct_key")]
     oct_key: String,
+    #[serde(default = "default_refresh_ratio")]
     refresh_ratio: f32,
+    #[serde(default)]
     expires: HashMap<String, u64>,
 }
 
 impl Default for TokenConfig {
     fn default() -> Self {
-        fn random_oct_key() -> String {
-            let key: [u8; 32] = random();
-            base64::prelude::BASE64_STANDARD.encode(key)
-        }
-
         Self {
             service_conf: Default::default(),
             redis: Default::default(),
             etcd: Default::default(),
             oct_key: random_oct_key(),
-            refresh_ratio: 3.0,
+            refresh_ratio: default_refresh_ratio(),
             expires: Default::default(),
         }
     }
 }
 
 type Register<T> = register::Register<TokenConfig, T>;
+type RefRegister<T> = Register<&'static T>;
 
 #[derive(Clone)]
 pub struct TokenResolver {
     conf: TokenConfig,
-    encode_key: Register<EncodingKey>,
-    decode_key: Register<DecodingKey>,
-    redis: Register<RedisStore>,
+    encode_key: RefRegister<EncodingKey>,
+    decode_key: RefRegister<DecodingKey>,
+    redis: RefRegister<redis::Client>,
 }
 
 impl Resolver for TokenResolver {
@@ -75,16 +81,14 @@ impl TokenResolver {
     pub fn new(conf: TokenConfig) -> Self {
         Self {
             conf,
-            encode_key: Register::once(|conf| {
+            encode_key: Register::once_ref(|conf| {
                 EncodingKey::from_base64_secret(conf.oct_key.as_str()).unwrap()
             }),
-            decode_key: Register::once(|conf| {
+            decode_key: Register::once_ref(|conf| {
                 DecodingKey::from_base64_secret(conf.oct_key.as_str()).unwrap()
             }),
-            redis: Register::once(|conf| {
-                RedisStore(
-                    redis::Client::open(conf.redis.dsn.as_str()).expect("unexpect redis dsn"),
-                )
+            redis: Register::once_ref(|conf| {
+                redis::Client::open(conf.redis.dsn.as_str()).expect("unexpect redis dsn")
             }),
         }
     }
@@ -93,15 +97,18 @@ impl TokenResolver {
         self.conf.expires.insert(audience.into(), expire);
     }
 
-    pub fn make_discover(&self) -> EtcdDiscover {
-        let conf = EtcdDiscoverConf::new(
+    pub async fn register_service(&self) {
+        let registry = EtcdRegistry::register(
             self.conf.etcd.clone(),
             self.conf.service_conf.service.clone(),
         );
-        EtcdDiscover::new(conf)
+        registry
+            .register_service(Self::DOMAIN)
+            .await
+            .expect("cannot register service into etcd");
     }
 
-    pub async fn make_serve(&self) -> impl Future<Output = Result<(), tonic::transport::Error>> {
+    pub async fn serve(&self) -> Result<(), tonic::transport::Error> {
         let token_srv = TokenService(self.clone());
         let addr = self
             .conf
@@ -109,7 +116,7 @@ impl TokenResolver {
             .service
             .listen_addr
             .parse()
-            .expect("a valid listen_addr");
+            .expect("cannot parse a valid listen_addr");
 
         let layer = ServiceBuilder::new()
             .catch_panic()
@@ -135,14 +142,14 @@ impl TokenResolver {
             })
             .add_service(TokenServiceServer::new(token_srv));
 
-        serve.serve(addr)
+        serve.serve(addr).await
     }
 
-    pub(in crate::domain) fn decode_key(&self) -> DecodingKey {
+    pub(in crate::domain) fn decode_key(&self) -> &'static DecodingKey {
         self.resolve(&self.decode_key)
     }
 
-    pub(in crate::domain) fn encode_key(&self) -> EncodingKey {
+    pub(in crate::domain) fn encode_key(&self) -> &'static EncodingKey {
         self.resolve(&self.encode_key)
     }
 
@@ -150,7 +157,7 @@ impl TokenResolver {
         Algorithm::HS256
     }
 
-    pub(in crate::domain) fn redis_store(&self) -> RedisStore {
+    pub(in crate::domain) fn redis_store(&self) -> &'static redis::Client {
         self.resolve(&self.redis)
     }
 }

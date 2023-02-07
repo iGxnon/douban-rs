@@ -12,55 +12,61 @@ use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 use tonic::{Code, Status as TonicStatus};
 
+pub extern crate faststr;
+
 pub mod prelude {
     pub use crate::debug_expand;
     pub use crate::status::detail::*;
     pub use crate::status::ext::*;
+    pub use crate::status::faststr::*;
 }
 
 pub mod detail {
     use super::*;
+    use faststr::FastStr;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(tag = "@type")]
-    pub enum ErrorDetail<'a> {
+    pub enum ErrorDetail {
         ErrorInfo {
-            reason: &'a str,
-            domain: &'a str,
-            metadata: HashMap<&'a str, &'a str>,
+            reason: FastStr,
+            domain: FastStr,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            metadata: Option<HashMap<String, FastStr>>, // FastStr is an interior mutable type, it's not suitable to use it as the Hash key
         },
         RetryInfo {
             retry_delay: Duration,
         },
         DebugInfo {
-            stack_entries: Vec<&'a str>,
-            detail: &'a str,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            stack_entries: Option<Vec<FastStr>>,
+            detail: FastStr,
         },
         QuotaFailure {
-            violations: Vec<QuotaViolation<'a>>,
+            violations: Vec<QuotaViolation>,
         },
         PreconditionFailure {
-            violations: Vec<PreconditionViolation<'a>>,
+            violations: Vec<PreconditionViolation>,
         },
         BadRequest {
-            field_violations: Vec<FieldViolation<'a>>,
+            field_violations: Vec<FieldViolation>,
         },
         RequestInfo {
-            request_id: &'a str,
-            serving_data: &'a str,
+            request_id: FastStr,
+            serving_data: FastStr,
         },
         ResourceInfo {
-            resource_type: &'a str,
-            resource_name: &'a str,
-            owner: &'a str,
-            description: &'a str,
+            resource_type: FastStr,
+            resource_name: FastStr,
+            owner: FastStr,
+            description: FastStr,
         },
         Help {
-            links: Vec<Link<'a>>,
+            links: Vec<Link>,
         },
         LocalizedMessage {
-            locale: &'a str,
-            message: &'a str,
+            locale: FastStr,
+            message: FastStr,
         },
     }
 
@@ -76,7 +82,7 @@ pub mod detail {
         };
     }
 
-    impl<'a> ErrorDetail<'a> {
+    impl ErrorDetail {
         is_implement!(
             (is_error_info, ErrorInfo);
             (is_retry_info, RetryInfo);
@@ -89,59 +95,72 @@ pub mod detail {
             (is_help, Help);
             (is_localized_message, LocalizedMessage);
         );
+
+        pub fn is_sensitive(&self) -> bool {
+            self.is_debug_info()
+        }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct QuotaViolation<'a> {
-        pub subject: &'a str,
-        pub description: &'a str,
+    pub struct QuotaViolation {
+        pub subject: FastStr,
+        pub description: FastStr,
     }
 
-    impl<'a> From<(&'a str, &'a str)> for QuotaViolation<'a> {
-        fn from(value: (&'a str, &'a str)) -> Self {
+    impl From<(&'static str, &'static str)> for QuotaViolation {
+        fn from(value: (&'static str, &'static str)) -> Self {
             Self {
-                subject: value.0,
-                description: value.1,
+                subject: value.0.into(),
+                description: value.1.into(),
             }
         }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct PreconditionViolation<'a> {
-        pub r#type: &'a str,
-        pub subject: &'a str,
-        pub description: &'a str,
+    pub struct PreconditionViolation {
+        pub r#type: FastStr,
+        pub subject: FastStr,
+        pub description: FastStr,
     }
 
-    impl<'a> From<(&'a str, &'a str, &'a str)> for PreconditionViolation<'a> {
-        fn from(value: (&'a str, &'a str, &'a str)) -> Self {
+    impl From<(&'static str, &'static str, &'static str)> for PreconditionViolation {
+        fn from(value: (&'static str, &'static str, &'static str)) -> Self {
             Self {
-                r#type: value.0,
-                subject: value.1,
-                description: value.2,
+                r#type: value.0.into(),
+                subject: value.1.into(),
+                description: value.2.into(),
             }
         }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct FieldViolation<'a> {
-        pub filed: &'a str,
-        pub description: &'a str,
+    pub struct FieldViolation {
+        pub filed: FastStr,
+        pub description: FastStr,
     }
 
-    impl<'a> From<(&'a str, &'a str)> for FieldViolation<'a> {
-        fn from(value: (&'a str, &'a str)) -> Self {
+    impl From<(&'static str, &'static str)> for FieldViolation {
+        fn from(value: (&'static str, &'static str)) -> Self {
             Self {
-                filed: value.0,
-                description: value.1,
+                filed: value.0.into(),
+                description: value.1.into(),
             }
         }
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct Link<'a> {
-        pub description: &'a str,
-        pub url: &'a str,
+    pub struct Link {
+        pub description: FastStr,
+        pub url: FastStr,
+    }
+
+    impl From<(&'static str, &'static str)> for Link {
+        fn from(value: (&'static str, &'static str)) -> Self {
+            Self {
+                description: value.0.into(),
+                url: value.1.into(),
+            }
+        }
     }
 }
 
@@ -229,7 +248,7 @@ pub mod prompt {
     /// use common::unauthenticated;
     /// use common::status::prelude::*;
     ///
-    /// unauthenticated!("json web token is expired", "bad.apple", [("good", "boy")].into());
+    /// unauthenticated!("json web token is expired", "bad.apple", [("good".into(), "boy".into())].into());
     /// unauthenticated!("json web token is expired", "bad.apple");
     /// unauthenticated!();
     /// ```
@@ -238,18 +257,18 @@ pub mod prompt {
         ($reason:expr, $domain:expr, $metadata:expr) => {
             ::tonic::Status::unauthenticated("Invalid authentication credentials.").add_detail(
                 ErrorDetail::ErrorInfo {
-                    reason: $reason,
-                    domain: $domain,
-                    metadata: $metadata,
+                    reason: $reason.into(),
+                    domain: $domain.into(),
+                    metadata: Some($metadata),
                 },
             )
         };
         ($reason:expr, $domain:expr) => {
             ::tonic::Status::unauthenticated("Invalid authentication credentials.").add_detail(
                 ErrorDetail::ErrorInfo {
-                    reason: $reason,
-                    domain: $domain,
-                    metadata: Default::default(),
+                    reason: $reason.into(),
+                    domain: $domain.into(),
+                    metadata: None,
                 },
             )
         };
@@ -299,7 +318,7 @@ pub mod prompt {
     /// use common::aborted;
     /// use common::status::prelude::*;
     ///
-    /// aborted!("json web token is expired", "bad.apple", [("good", "boy")].into());
+    /// aborted!("json web token is expired", "bad.apple", [("good".into(), "boy".into())].into());
     /// aborted!("json web token is expired", "bad.apple");
     /// aborted!();
     /// ```
@@ -307,16 +326,16 @@ pub mod prompt {
     macro_rules! aborted {
         ($reason:expr, $domain:expr, $metadata:expr) => {
             ::tonic::Status::aborted("Request aborted.").add_detail(ErrorDetail::ErrorInfo {
-                reason: $reason,
-                domain: $domain,
-                metadata: $metadata,
+                reason: $reason.into(),
+                domain: $domain.into(),
+                metadata: Some($metadata),
             })
         };
         ($reason:expr, $domain:expr) => {
             ::tonic::Status::aborted("Request aborted.").add_detail(ErrorDetail::ErrorInfo {
-                reason: $reason,
-                domain: $domain,
-                metadata: Default::default(),
+                reason: $reason.into(),
+                domain: $domain.into(),
+                metadata: None,
             })
         };
         () => {
@@ -389,8 +408,8 @@ pub mod prompt {
                 .collect();
 
             ::tonic::Status::$macr($mess).add_detail(ErrorDetail::DebugInfo {
-                stack_entries,
-                detail: "",
+                stack_entries: Some(stack_entries.into_iter().map(FastStr::new).collect()),
+                detail: "stack entries".into(),
             })
         }};
         (capture, $detail:expr, $macr:ident, $mess:literal) => {{
@@ -408,20 +427,20 @@ pub mod prompt {
                 .collect();
 
             ::tonic::Status::$macr($mess).add_detail(ErrorDetail::DebugInfo {
-                stack_entries,
-                detail: $detail,
+                stack_entries: Some(stack_entries.into_iter().map(FastStr::new).collect()),
+                detail: $detail.into(),
             })
         }};
         ($detail:expr, $stacks:expr, $macr:ident, $mess:literal) => {
             ::tonic::Status::$macr($mess).add_detail(ErrorDetail::DebugInfo {
-                stack_entries: $stacks,
-                detail: $detail,
+                stack_entries: Some($stacks.into_iter().map(FastStr::new).collect()),
+                detail: $detail.into(),
             })
         };
         ($detail:expr, $macr:ident, $mess:literal) => {
             ::tonic::Status::$macr($mess).add_detail(ErrorDetail::DebugInfo {
-                stack_entries: Default::default(),
-                detail: $detail,
+                stack_entries: None,
+                detail: $detail.into(),
             })
         };
         ($macr:ident, $mess:literal) => {
@@ -614,12 +633,11 @@ pub mod prompt {
 
 pub mod ext {
     use super::*;
-    use std::any::TypeId;
     use std::sync::Arc;
     use thiserror::Error;
 
-    pub trait StatusExt<'a> {
-        fn add_detail(self, detail: ErrorDetail<'a>) -> Self;
+    pub trait StatusExt {
+        fn add_detail(self, detail: ErrorDetail) -> Self;
     }
 
     pub trait CodeExt {
@@ -634,7 +652,7 @@ pub mod ext {
         }
     }
 
-    impl<'a> StatusExt<'a> for TonicStatus {
+    impl StatusExt for TonicStatus {
         fn add_detail(self, detail: ErrorDetail) -> Self {
             let mut details = check_list(self.details());
             details.push(detail);
@@ -674,16 +692,62 @@ pub mod ext {
         }
     }
 
-    #[derive(Serialize, Debug, Error, Default)]
-    pub struct HttpStatus<E> {
-        details: Option<E>,
+    #[derive(Serialize, Debug, Error)]
+    pub struct HttpStatus {
+        details: Option<Vec<ErrorDetail>>,
+        #[serde(skip)]
+        code: StatusCode,
         #[serde(skip)]
         #[source]
         source: Option<Arc<dyn Error + Send + Sync + 'static>>,
     }
 
-    impl<'a> StatusExt<'a> for HttpStatus<Vec<ErrorDetail<'a>>> {
-        fn add_detail(mut self, detail: ErrorDetail<'a>) -> Self {
+    impl HttpStatus {
+        pub fn new(code: StatusCode, details: Option<Vec<ErrorDetail>>) -> Self {
+            Self {
+                details,
+                code,
+                source: None,
+            }
+        }
+
+        pub fn with_code(code: StatusCode) -> Self {
+            Self {
+                details: None,
+                code,
+                source: None,
+            }
+        }
+
+        pub fn filter_sensitive_details(mut self, details: &[ErrorDetail]) -> Self {
+            for detail in details {
+                if !detail.is_sensitive() {
+                    self = self.add_detail(detail.clone());
+                }
+            }
+            self
+        }
+    }
+
+    impl From<tonic::Status> for HttpStatus {
+        fn from(value: TonicStatus) -> Self {
+            serde_json::from_slice::<Vec<ErrorDetail>>(value.details())
+                .map(|details: Vec<ErrorDetail>| {
+                    HttpStatus::with_code(value.code().to_http_code())
+                        .filter_sensitive_details(details.as_slice())
+                })
+                .unwrap_or_else(|_| HttpStatus::with_code(value.code().to_http_code()))
+        }
+    }
+
+    impl Display for HttpStatus {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(f, "HttpStatus({})", &self.code)
+        }
+    }
+
+    impl StatusExt for HttpStatus {
+        fn add_detail(mut self, detail: ErrorDetail) -> Self {
             let mut errs = self.details.unwrap_or_default();
             errs.push(detail);
             self.details = Some(errs);
@@ -691,10 +755,10 @@ pub mod ext {
         }
     }
 
-    pub type HttpResult<'a, T> = Result<Option<T>, Option<HttpStatus<Vec<ErrorDetail<'a>>>>>;
+    pub type HttpResult<T> = Result<Option<T>, Option<HttpStatus>>;
 
-    impl<'a, T> From<HttpResult<'a, T>> for Resp<'a, T> {
-        fn from(value: HttpResult<'a, T>) -> Self {
+    impl<T> From<HttpResult<T>> for Resp<T> {
+        fn from(value: HttpResult<T>) -> Self {
             match value {
                 Ok(data) => Resp {
                     ok: true,
@@ -710,16 +774,33 @@ pub mod ext {
         }
     }
 
+    impl<T, E> From<Result<T, E>> for Resp<T, E> {
+        fn from(value: Result<T, E>) -> Self {
+            match value {
+                Ok(data) => Resp {
+                    ok: true,
+                    data: Some(data),
+                    err: None,
+                },
+                Err(err) => Resp {
+                    ok: false,
+                    data: None,
+                    err: Some(err),
+                },
+            }
+        }
+    }
+
     #[derive(Serialize, Debug)]
-    pub struct Resp<'a, T> {
+    pub struct Resp<T, E = HttpStatus> {
         ok: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         data: Option<T>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        err: Option<HttpStatus<Vec<ErrorDetail<'a>>>>,
+        err: Option<E>,
     }
 
-    impl<'a, T> Resp<'a, T> {
+    impl<T> Resp<T, ()> {
         pub fn ok(data: T) -> Self {
             Self {
                 ok: true,
@@ -727,17 +808,41 @@ pub mod ext {
                 err: None,
             }
         }
+    }
 
-        pub fn failed(status: HttpStatus<Vec<ErrorDetail<'a>>>) -> Self {
+    impl<E> Resp<(), E> {
+        pub fn failed(err: E) -> Self {
             Self {
                 ok: false,
                 data: None,
-                err: Some(status),
+                err: Some(err),
+            }
+        }
+    }
+
+    impl<T> Resp<T> {
+        pub fn failed_detail(code: StatusCode, detail: ErrorDetail) -> Self {
+            Self {
+                ok: false,
+                data: None,
+                err: Some(HttpStatus::new(code, Some(vec![detail]))),
             }
         }
 
-        pub fn failed_detail(detail: ErrorDetail<'a>) -> Self {
-            Self::failed(HttpStatus::default().add_detail(detail))
+        pub fn failed_details(code: StatusCode, details: Vec<ErrorDetail>) -> Self {
+            Self {
+                ok: false,
+                data: None,
+                err: Some(HttpStatus::new(code, Some(details))),
+            }
+        }
+
+        pub fn failed_code(code: StatusCode) -> Self {
+            Self {
+                ok: false,
+                data: None,
+                err: Some(HttpStatus::with_code(code)),
+            }
         }
     }
 
@@ -815,8 +920,8 @@ pub mod ext {
         }
     }
 
-    impl<'a> StatusExt<'a> for GrpcStatus {
-        fn add_detail(self, detail: ErrorDetail<'a>) -> Self {
+    impl StatusExt for GrpcStatus {
+        fn add_detail(self, detail: ErrorDetail) -> Self {
             self.0.add_detail(detail).into()
         }
     }

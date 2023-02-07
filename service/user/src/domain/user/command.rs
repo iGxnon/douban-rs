@@ -1,2 +1,2 @@
-pub mod register;
 pub mod bind;
+pub mod register;

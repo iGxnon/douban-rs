@@ -15,6 +15,8 @@ use tower::{Layer, Service};
 
 const DEFAULT_MAX_AGE: i64 = 2 * 24 * 60 * 60; // 2 days
 pub const DEFAULT_COOKIE_NAME: &str = "x-token";
+pub const DEFAULT_COOKIE_PATH: &str = "/";
+pub const DEFAULT_COOKIE_DOMAIN: &str = "";
 
 // wrap serde traits for cookie::SameSite
 #[derive(Clone, Debug)]
@@ -100,8 +102,8 @@ impl Default for CookieAuthConf {
             http_only: true,
             secure: true,
             same_site: Default::default(),
-            path: optional("COOKIE_AUTH_PATH", "/"),
-            domain: optional("COOKIE_AUTH_DOMAIN", ""),
+            path: DEFAULT_COOKIE_PATH.to_string(),
+            domain: DEFAULT_COOKIE_DOMAIN.to_string(),
             encrypted: None,
             cookie_name: DEFAULT_COOKIE_NAME.to_string(),
         }

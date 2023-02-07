@@ -1,11 +1,15 @@
+use crate::domain::user::UserResolver;
 use crate::rest::error::handle_error;
 use axum::error_handling::HandleErrorLayer;
-use common::config::register;
+use common::config::middleware::MiddlewareConfig;
 use common::config::service::ServiceConfig;
 use common::config::Config;
 use common::infra::*;
+use common::registry::{EtcdRegistry, ServiceDiscover};
+use proto::pb::user::sys::v1::user_service_client::UserServiceClient;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tonic::transport::Channel;
 use tower::load_shed::LoadShedLayer;
 use tower::ServiceBuilder;
 use tower_http::ServiceBuilderExt;
@@ -16,21 +20,22 @@ mod router;
 mod types;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(default)]
 pub struct RestConfig {
-    pub service_conf: <Config as ServiceConfig>::ApiService,
+    #[serde(default)]
+    pub service_conf: <Config as ServiceConfig>::RestService,
+    #[serde(default)]
+    pub etcd: <Config as MiddlewareConfig>::Etcd,
 }
 
-type Register<T> = register::Register<RestConfig, T>;
-
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RestResolver {
     conf: RestConfig,
+    user_service: UserServiceClient<Channel>,
 }
 
 impl Resolver for RestResolver {
     const TARGET: Target = Target::REST;
-    const DOMAIN: &'static str = "user";
+    const DOMAIN: &'static str = "user-rest";
     type Config = RestConfig;
 
     fn conf(&self) -> &Self::Config {
@@ -39,8 +44,19 @@ impl Resolver for RestResolver {
 }
 
 impl RestResolver {
-    pub fn new(conf: RestConfig) -> Self {
-        Self { conf }
+    pub async fn new(conf: RestConfig) -> Self {
+        let registry = EtcdRegistry::discover(conf.etcd.clone());
+        let (channel, tx) = Channel::balance_channel(1024);
+        registry
+            .discover_to_channel(UserResolver::DOMAIN, tx)
+            .await
+            .expect("Cannot discover user service to channel");
+        let user_service = UserServiceClient::new(channel);
+        Self { conf, user_service }
+    }
+
+    pub fn user_service(&self) -> UserServiceClient<Channel> {
+        self.user_service.clone()
     }
 
     pub async fn serve(&self) {
