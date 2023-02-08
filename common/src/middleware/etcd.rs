@@ -1,37 +1,26 @@
 use crate::config::env::optional;
+use crate::define_config;
 use crate::middleware::Middleware;
 use async_trait::async_trait;
 use etcd_client::ConnectOptions;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::ops::Deref;
 
-fn default_keep_alive_while_idle() -> bool {
-    true
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct EtcdConf {
-    #[serde(default)]
-    pub endpoints: Vec<String>,
-    /// user is a pair values of name and password
-    #[serde(default)]
-    pub user: Option<(String, String)>,
-    /// Whether send keep alive pings even there are no active streams.
-    #[serde(default = "default_keep_alive_while_idle")]
-    pub keep_alive_while_idle: bool,
-}
-
-impl Default for EtcdConf {
-    fn default() -> Self {
-        let endpoints: Vec<String> = optional("ETCD_ENDPOINTS", "127.0.0.1:2379")
-            .split('|')
-            .map(ToOwned::to_owned)
-            .collect();
-
-        Self {
-            endpoints,
-            user: None,
-            keep_alive_while_idle: default_keep_alive_while_idle(),
+define_config! {
+    #[derive(Serialize, Debug)]
+    pub EtcdConf (
+        pub user: Option<(String, String)>,
+    ) {
+        #[default_endpoints = "default_endpoints"]
+        pub endpoints -> Vec<String> {
+            optional("ETCD_ENDPOINTS", "127.0.0.1:2379")
+                .split('|')
+                .map(ToOwned::to_owned)
+                .collect()
+        },
+        #[default_keep_alive_while_idle = "default_keep_alive_while_idle"]
+        pub keep_alive_while_idle -> bool {
+            true
         }
     }
 }

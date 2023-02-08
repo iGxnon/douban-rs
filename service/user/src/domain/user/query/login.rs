@@ -5,11 +5,14 @@ use crate::domain::user::UserResolver;
 
 #[tracing::instrument(skip_all, err)]
 async fn execute(req: pb::LoginReq) -> GrpcResult<pb::LoginRes> {
-    todo!()
+    Ok(pb::LoginRes {
+        access: None,
+        refresh: None,
+    })
 }
 
 impl UserResolver {
     pub fn create_login(&self) -> impl Command<pb::LoginReq> + '_ {
-        move |req: pb::LoginReq| async move { todo!() }
+        move |req: pb::LoginReq| async move { execute(req).await }
     }
 }

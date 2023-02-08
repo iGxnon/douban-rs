@@ -1,21 +1,16 @@
 use crate::config::env::optional;
 use crate::middleware::Middleware;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use crate::define_config;
 
-fn default_dsn() -> String {
-    optional("APP_REDIS", "redis://127.0.0.1/")
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct RedisConf {
-    #[serde(default = "default_dsn")]
-    pub dsn: String,
-}
-
-impl Default for RedisConf {
-    fn default() -> Self {
-        Self { dsn: default_dsn() }
+define_config! {
+    #[derive(Serialize, Debug)]
+    pub RedisConf {
+        #[default_dsn = "default_dsn"]
+        pub dsn -> String {
+            optional("APP_REDIS", "redis://127.0.0.1/")
+        }
     }
 }
 

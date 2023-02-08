@@ -96,71 +96,45 @@ pub mod register {
 }
 
 #[macro_export]
-macro_rules! define_conf {
+macro_rules! define_config {
     (
         $(#[derive($($der:ident),+)])?
-        $vis:vis struct $conf:ident {
+        $vis:vis $conf:ident $((
             $(
-                $(#($de:ident))?
-                $(#[$dname:ident = $b:block, $iname:literal])?
-                $fvis:vis $fname:ident: $typ:ty,
+                $dfvis:vis $dfname:ident: $dtyp:ty,
             )*
-        }
+        ))? $({
+            $(
+                #[$ff:ident = $ffs:literal]
+                $fvis:vis $fname:ident -> $typ:ty $dft:block
+            ),*
+        })?
     ) => {
         #[derive(Clone, serde::Deserialize, $($($der),+)?)]
         $vis struct $conf {
-            $(
-                $(#[serde(default = $iname)])?
-                $(#[serde($de)])?
-                $fvis $fname: $typ
-            ),*
+            $($(
+                #[serde(default)]
+                $dfvis $dfname: $dtyp,
+            )*)?
+            $($(
+                #[serde(default = $ffs)]
+                $fvis $fname: $typ,
+            )*)?
         }
 
         $(
-            $(fn $dname() -> $typ $b)?
+            $(fn $ff() -> $typ $dft)?
         )*
 
         impl Default for $conf {
             fn default() -> Self {
                 Self {
-                    $(
-                        $($fname: Default::$de(),)?
-                        $($fname: $dname(),)?
-                    )*
-                }
-            }
-        }
-    };
-    (
-        $(#[derive($($der:ident),+)])?
-        $vis:vis struct $conf:ident {
-            $(
-                $(#($de:ident))?
-                $(#[$dname:ident = $e:expr, $iname:literal])?
-                $fvis:vis $fname:ident: $typ:ty,
-            )*
-        }
-    ) => {
-        #[derive(Clone, serde::Deserialize, $($($der),+)?)]
-        $vis struct $conf {
-            $(
-                $(#[serde(default = $iname)])?
-                $(#[serde($de)])?
-                $fvis $fname: $typ
-            ),*
-        }
-
-        $(
-            $(fn $dname() -> $typ { $e })?
-        )*
-
-        impl Default for $conf {
-            fn default() -> Self {
-                Self {
-                    $(
-                        $($fname: Default::$de(),)?
-                        $($fname: $dname(),)?
-                    )*
+                    $($(
+                        $dfname: Default::default(),
+                    )*)?
+                    $($(
+                        $fname: $ff(),
+                    )*)?
                 }
             }
         }
@@ -177,18 +151,17 @@ mod test {
     use base64::Engine;
     use rand::random;
 
-    define_conf! {
+    define_config! {
         #[derive(Debug)]
-        struct MyConfig {
-            #(default)
+        MyConfig (
             service_conf: <Config as ServiceConfig>::GrpcService,
-            #(default)
             redis: <Config as MiddlewareConfig>::Redis,
-            #[default_key = {
+        ) {
+            #[default_encode_key = "default_encode_key"]
+            encode_key -> String {
                 let bytes: [u8; 32] = random();
                 base64::prelude::BASE64_STANDARD.encode(bytes)
-            }, "default_key"]
-            encode_key: String,
+            }
         }
     }
 

@@ -1,14 +1,16 @@
 use common::infra::Resolver;
 use common::utils::parse_config;
-use user::rest::RestResolver;
+use user::rest::{RestConfig, RestResolver};
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let conf = parse_config(RestResolver::DOMAIN)
+    let mut conf: RestConfig = parse_config(RestResolver::DOMAIN)
         .await
         .expect("Cannot parse config");
+
+    conf.service_conf.service.listen_addr = "0.0.0.0:5001".to_string();
 
     println!("{}", serde_json::to_string_pretty(&conf).unwrap());
 
