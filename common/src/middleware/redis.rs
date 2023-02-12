@@ -1,8 +1,8 @@
 use crate::config::env::optional;
+use crate::define_config;
 use crate::middleware::Middleware;
 use async_trait::async_trait;
 use serde::Serialize;
-use crate::define_config;
 
 define_config! {
     #[derive(Serialize, Debug)]

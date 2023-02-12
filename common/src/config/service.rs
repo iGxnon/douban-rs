@@ -1,8 +1,8 @@
 use super::env::*;
 use super::*;
+use crate::define_config;
 use names::Generator;
 use serde::Serialize;
-use crate::define_config;
 
 pub trait ServiceConfig {
     type RestService: ConfigType;

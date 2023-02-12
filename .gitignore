@@ -9,3 +9,6 @@
 config/*
 # remain templates for configurations
 !config/template
+
+.env
+*/.env

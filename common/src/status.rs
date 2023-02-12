@@ -205,7 +205,7 @@ pub mod prompt {
     /// use common::status::prelude::*;
     ///
     /// failed_precondition!("Directory {} is not empty, so it cannot be deleted.", "hah");
-    /// failed_precondition!([("TOS", "auth.service", "Term of auth service is not accept.").into()].into());
+    /// failed_precondition!([("TOS", "auth.service_old", "Term of auth service_old is not accept.").into()].into());
     /// ```
     #[macro_export]
     macro_rules! failed_precondition {
