@@ -5,7 +5,7 @@ create table t_oauth
     id     serial8
         constraint t_oauth_pk
             primary key,
-    github bigint
+    github bigint default null
 );
 
 comment on table t_oauth is 'oauth table for user, used for scalable oauth apps';

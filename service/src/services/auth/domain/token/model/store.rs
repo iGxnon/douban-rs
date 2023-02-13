@@ -11,7 +11,7 @@ use tonic::async_trait;
 impl Query<RedisGet<Option<Self>>> for Token {
     async fn execute(&self, input: RedisGet<Option<Self>>) -> GrpcResult<Option<Self>> {
         // TODO connection pool for redis
-        let store = input.dst();
+        let store = input.into_from();
         let mut conn = store
             .get_async_connection()
             .await
@@ -33,7 +33,7 @@ impl Query<RedisGet<Option<Self>>> for Token {
 #[async_trait]
 impl Command<RedisSet> for Token {
     async fn execute(self, input: RedisSet) -> GrpcResult<()> {
-        let store = input.dst();
+        let store = input.into_dst();
         let mut conn = store
             .get_async_connection()
             .await
@@ -54,7 +54,7 @@ impl Command<RedisSet> for Token {
 #[async_trait]
 impl Command<RedisDel> for Token {
     async fn execute(self, input: RedisDel) -> GrpcResult<()> {
-        let store = input.dst();
+        let store = input.into_dst();
         let mut conn = store
             .get_async_connection()
             .await
@@ -63,6 +63,6 @@ impl Command<RedisDel> for Token {
         conn.del(&key)
             .await
             .map_err(|_| internal!(format!("Failed to del key {}", key)))?;
-        todo!()
+        Ok(())
     }
 }
