@@ -2,7 +2,7 @@
 members = [
     "proto",
     "migration",
-    "common",
+    "common-rs",
     "cli",
     "service",
 ]
