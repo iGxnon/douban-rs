@@ -24,23 +24,18 @@ pub struct RegisterReq {
     #[prost(string, tag = "2")]
     pub password: ::prost::alloc::string::String,
 }
-/// TODO common empty response
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct RegisterRes {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BindReq {
     #[prost(string, tag = "1")]
-    pub email: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
-    pub phone: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub oauth_id: ::prost::alloc::string::String,
+    pub identifier: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "2")]
+    pub email: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub phone: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "4")]
+    pub github: ::core::option::Option<::prost::alloc::string::String>,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BindRes {}
 /// Generated client implementations.
 pub mod user_service_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
@@ -132,7 +127,10 @@ pub mod user_service_client {
         pub async fn register(
             &mut self,
             request: impl tonic::IntoRequest<super::RegisterReq>,
-        ) -> Result<tonic::Response<super::RegisterRes>, tonic::Status> {
+        ) -> Result<
+            tonic::Response<super::super::super::super::common::v1::EmptyRes>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -151,7 +149,10 @@ pub mod user_service_client {
         pub async fn bind(
             &mut self,
             request: impl tonic::IntoRequest<super::BindReq>,
-        ) -> Result<tonic::Response<super::BindRes>, tonic::Status> {
+        ) -> Result<
+            tonic::Response<super::super::super::super::common::v1::EmptyRes>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -183,11 +184,17 @@ pub mod user_service_server {
         async fn register(
             &self,
             request: tonic::Request<super::RegisterReq>,
-        ) -> Result<tonic::Response<super::RegisterRes>, tonic::Status>;
+        ) -> Result<
+            tonic::Response<super::super::super::super::common::v1::EmptyRes>,
+            tonic::Status,
+        >;
         async fn bind(
             &self,
             request: tonic::Request<super::BindReq>,
-        ) -> Result<tonic::Response<super::BindRes>, tonic::Status>;
+        ) -> Result<
+            tonic::Response<super::super::super::super::common::v1::EmptyRes>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct UserServiceServer<T: UserService> {
@@ -289,7 +296,7 @@ pub mod user_service_server {
                     struct RegisterSvc<T: UserService>(pub Arc<T>);
                     impl<T: UserService> tonic::server::UnaryService<super::RegisterReq>
                     for RegisterSvc<T> {
-                        type Response = super::RegisterRes;
+                        type Response = super::super::super::super::common::v1::EmptyRes;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
@@ -325,7 +332,7 @@ pub mod user_service_server {
                     struct BindSvc<T: UserService>(pub Arc<T>);
                     impl<T: UserService> tonic::server::UnaryService<super::BindReq>
                     for BindSvc<T> {
-                        type Response = super::BindRes;
+                        type Response = super::super::super::super::common::v1::EmptyRes;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,

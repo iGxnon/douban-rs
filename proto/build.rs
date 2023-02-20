@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::Path;
 
 const DERIVE_SER_DER: &str = "#[derive(serde::Serialize, serde::Deserialize)]";
@@ -10,8 +12,7 @@ fn main() {
         .unwrap()
         .flat_map(Result::ok)
         .collect();
-    // let protos = ["auth/token/v1/token.proto", "user/sys/v1/sys.proto"];
-    let proto_dir: &Path = ".".as_ref();
+    let proto_dir: &Path = "src".as_ref();
 
     tonic_build::configure()
         .derive_for("auth.token.v1.Token", vec![DERIVE_SER_DER, DERIVE_DEFAULT])

@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package auth.token.v1;
+
+import "common/v1/common.proto";
+
+enum TokenKind {
+  ACCESS = 0;
+  REFRESH = 1;
+}
+
+message Token {
+  string value = 1;
+  TokenKind kind = 2;
+}
+
+message Payload {
+  string sub = 1;
+  string group = 2;
+  string extra = 3;
+}
+
+message GenerateTokenReq {
+  string sub = 1;
+  string aud = 2;
+  optional bool jti = 3;
+  optional Payload payload = 4;
+}
+
+message GenerateTokenRes {
+  Token access = 1;
+  Token refresh = 2;
+}
+
+message ParseTokenReq {
+  string value = 1;
+}
+
+message ParseTokenRes {
+  bool checked = 1;
+  bool expired = 2;
+  TokenKind kind = 3;
+  Payload payload = 4;
+}
+
+message RefreshTokenReq {
+  string value = 1;
+}
+
+message RefreshTokenRes {
+  Token access = 1;
+  Token refresh = 2;
+}
+
+message ClearCacheReq {
+  string sub = 1;
+}
+
+service TokenService {
+  rpc GenerateToken(GenerateTokenReq) returns (GenerateTokenRes) {}
+  rpc ParseToken(ParseTokenReq) returns (ParseTokenRes) {}
+  rpc RefreshToken(RefreshTokenReq) returns (RefreshTokenRes) {}
+  rpc ClearCache(ClearCacheReq) returns (common.v1.EmptyRes) {}
+}

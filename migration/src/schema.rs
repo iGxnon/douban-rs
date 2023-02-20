@@ -16,6 +16,7 @@ diesel::table! {
         email -> Nullable<Varchar>,
         nickname -> Varchar,
         hashed_password -> Varchar,
+        role_group -> Varchar,
         create_at -> Timestamp,
         update_at -> Timestamp,
         delete_at -> Nullable<Timestamp>,

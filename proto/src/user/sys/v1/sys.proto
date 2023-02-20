@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package user.sys.v1;
+
+import "auth/token/v1/token.proto";
+import "common/v1/common.proto";
+
+message LoginReq {
+  string identifier = 1;
+  string password = 2;
+}
+
+message LoginRes {
+  auth.token.v1.Token access = 1;
+  auth.token.v1.Token refresh = 2;
+}
+
+message RegisterReq {
+  string username = 1;
+  string password = 2;
+}
+
+message BindReq {
+  string identifier = 1;
+  optional string email = 2;
+  optional string phone = 3;
+  optional string github = 4;
+}
+
+service UserService {
+  rpc Login(LoginReq) returns (LoginRes) {}
+  rpc Register(RegisterReq) returns (common.v1.EmptyRes) {}
+  rpc Bind(BindReq) returns (common.v1.EmptyRes) {}
+}

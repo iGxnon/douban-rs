@@ -1,5 +1,5 @@
 use common::infra::Resolver;
-use common::utils::parse_config;
+use common::utils::{config_tips, parse_config};
 use service::auth::domain::token::TokenResolver;
 
 #[tokio::main]
@@ -10,7 +10,7 @@ async fn main() {
         .await
         .expect("Cannot parse config");
 
-    println!("{}", serde_json::to_string_pretty(&config).unwrap());
+    config_tips(&config);
 
     let resolver = TokenResolver::new(config);
 

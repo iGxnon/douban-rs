@@ -1,5 +1,5 @@
 use common::infra::Resolver;
-use common::utils::parse_config;
+use common::utils::{config_tips, parse_config};
 use service::user::domain::user::UserResolver;
 
 #[tokio::main]
@@ -10,9 +10,9 @@ async fn main() {
         .await
         .expect("Cannot parse config");
 
-    println!("{}", serde_json::to_string_pretty(&config).unwrap());
+    config_tips(&config);
 
-    let resolver = UserResolver::new(config);
+    let resolver = UserResolver::new(config).await;
 
     resolver.register_service().await;
 

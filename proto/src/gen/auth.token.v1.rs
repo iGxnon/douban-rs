@@ -78,9 +78,6 @@ pub struct ClearCacheReq {
     #[prost(string, tag = "1")]
     pub sub: ::prost::alloc::string::String,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ClearCacheRes {}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum TokenKind {
@@ -236,7 +233,10 @@ pub mod token_service_client {
         pub async fn clear_cache(
             &mut self,
             request: impl tonic::IntoRequest<super::ClearCacheReq>,
-        ) -> Result<tonic::Response<super::ClearCacheRes>, tonic::Status> {
+        ) -> Result<
+            tonic::Response<super::super::super::super::common::v1::EmptyRes>,
+            tonic::Status,
+        > {
             self.inner
                 .ready()
                 .await
@@ -276,7 +276,10 @@ pub mod token_service_server {
         async fn clear_cache(
             &self,
             request: tonic::Request<super::ClearCacheReq>,
-        ) -> Result<tonic::Response<super::ClearCacheRes>, tonic::Status>;
+        ) -> Result<
+            tonic::Response<super::super::super::super::common::v1::EmptyRes>,
+            tonic::Status,
+        >;
     }
     #[derive(Debug)]
     pub struct TokenServiceServer<T: TokenService> {
@@ -462,7 +465,7 @@ pub mod token_service_server {
                         T: TokenService,
                     > tonic::server::UnaryService<super::ClearCacheReq>
                     for ClearCacheSvc<T> {
-                        type Response = super::ClearCacheRes;
+                        type Response = super::super::super::super::common::v1::EmptyRes;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,

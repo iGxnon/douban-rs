@@ -34,6 +34,7 @@ create table t_users
     email           varchar(256) default null,
     nickname        varchar(64)                not null,
     hashed_password varchar(64)                not null,
+    role_group      varchar(64)                not null,
     create_at       timestamp    default now() not null,
     update_at       timestamp    default now() not null,
     delete_at       timestamp    default null,
