@@ -1,0 +1,3 @@
+[submodule "common-rs"]
+	path = common-rs
+	url = git@github.com:LanshanTeam/common-rs.git
