@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "proto",
-    "migration",
-    "common-rs",
     "cli",
+    "common-rs",
+    "migration",
+    "proto",
     "service",
 ]

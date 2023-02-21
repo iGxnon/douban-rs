@@ -4,7 +4,6 @@ use common::infra::Query;
 use common::status::ext::GrpcResult;
 use proto::pb::auth::token::v1 as pb;
 use tracing::instrument;
-use tracing::log::trace;
 
 #[instrument(skip_all, err)]
 async fn execute(
@@ -12,7 +11,6 @@ async fn execute(
     key: &jsonwebtoken::DecodingKey,
     algorithm: jsonwebtoken::Algorithm,
 ) -> GrpcResult<pb::ParseTokenRes> {
-    trace!("Parsing token...");
     let token: Token = req.value.as_str().parse()?;
     let checked = token.validate(key, algorithm)?;
     let kind: pb::TokenKind = match token.kind() {

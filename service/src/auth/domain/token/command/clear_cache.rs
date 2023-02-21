@@ -4,9 +4,8 @@ use common::infra::*;
 use common::status::ext::GrpcResult;
 use proto::pb::auth::token::v1 as pb;
 use proto::pb::common::v1::EmptyRes;
-use redis::Commands;
 use std::ops::DerefMut;
-use tracing::{instrument, trace};
+use tracing::instrument;
 
 #[instrument(skip_all, err)]
 async fn execute(req: pb::ClearCacheReq, conn: &mut redis::Connection) -> GrpcResult<EmptyRes> {
