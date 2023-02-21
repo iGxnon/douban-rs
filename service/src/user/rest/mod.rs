@@ -50,7 +50,7 @@ impl RestResolver {
         registry
             .discover_to_channel(UserResolver::DOMAIN, tx)
             .await
-            .expect("Cannot discover user service_old to channel");
+            .expect("Cannot discover user service to channel");
         let user_service = UserServiceClient::new(channel);
         Self { conf, user_service }
     }

@@ -109,7 +109,7 @@ impl TokenResolver {
         registry
             .register_service(Self::DOMAIN)
             .await
-            .expect("cannot register service_old into etcd");
+            .expect("cannot register service into etcd");
     }
 
     pub async fn serve(&self) -> Result<(), tonic::transport::Error> {

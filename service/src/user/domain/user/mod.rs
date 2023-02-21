@@ -151,7 +151,7 @@ impl UserResolver {
         registry
             .register_service(Self::DOMAIN)
             .await
-            .expect("Cannot register service_old into etcd");
+            .expect("Cannot register service into etcd");
     }
 
     pub async fn serve(&self) -> Result<(), tonic::transport::Error> {
