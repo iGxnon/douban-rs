@@ -53,7 +53,7 @@ impl<'a> Default for PutUser<'a> {
             email: None,
             nickname: None,
             hashed_password: None,
-            update_at: Some(NaiveDateTime::default()),
+            update_at: Some(chrono::Local::now().naive_local()),
             last_login: None,
         }
     }
@@ -218,12 +218,18 @@ impl User {
     ) -> GrpcResult<User> {
         use migration::t_users::dsl::*;
 
-        let user: User = t_users
-            .filter(email.eq(mail))
-            .first(conn)
-            .map_err(map_not_found("user", mail))?;
-        user.check_password(password, secret)?;
-        Ok(user)
+        conn.transaction::<User, GrpcStatus, _>(|conn| {
+            let user: User = t_users
+                .filter(email.eq(mail))
+                .first(conn)
+                .map_err(map_not_found("user", mail))?;
+            user.check_password(password, secret)?;
+            diesel::update(t_users.filter(email.eq(mail)))
+                .set(last_login.eq(chrono::Local::now().naive_local()))
+                .execute(conn)
+                .map_err(map_not_found("user", mail))?;
+            Ok(user)
+        })
     }
 
     #[inline]
@@ -235,12 +241,18 @@ impl User {
     ) -> GrpcResult<User> {
         use migration::t_users::dsl::*;
 
-        let user: User = t_users
-            .filter(phone.eq(phone_num))
-            .first(conn)
-            .map_err(map_not_found("user", phone_num))?;
-        user.check_password(password, secret)?;
-        Ok(user)
+        conn.transaction::<User, GrpcStatus, _>(|conn| {
+            let user: User = t_users
+                .filter(phone.eq(phone_num))
+                .first(conn)
+                .map_err(map_not_found("user", phone_num))?;
+            user.check_password(password, secret)?;
+            diesel::update(t_users.filter(phone.eq(phone_num)))
+                .set(last_login.eq(chrono::Local::now().naive_local()))
+                .execute(conn)
+                .map_err(map_not_found("user", phone_num))?;
+            Ok(user)
+        })
     }
 
     #[inline]
@@ -252,12 +264,18 @@ impl User {
     ) -> GrpcResult<User> {
         use migration::t_users::dsl::*;
 
-        let user: User = t_users
-            .filter(username.eq(uname))
-            .first(conn)
-            .map_err(map_not_found("user", uname))?;
-        user.check_password(password, secret)?;
-        Ok(user)
+        conn.transaction::<User, GrpcStatus, _>(|conn| {
+            let user: User = t_users
+                .filter(username.eq(uname))
+                .first(conn)
+                .map_err(map_not_found("user", uname))?;
+            user.check_password(password, secret)?;
+            diesel::update(t_users.filter(username.eq(uname)))
+                .set(last_login.eq(chrono::Local::now().naive_local()))
+                .execute(conn)
+                .map_err(map_not_found("user", uname))?;
+            Ok(user)
+        })
     }
 
     #[inline]
@@ -269,12 +287,18 @@ impl User {
     ) -> GrpcResult<User> {
         use migration::t_users::dsl::*;
 
-        let user: User = t_users
-            .find(uid)
-            .first(conn)
-            .map_err(map_not_found("user", uid))?;
-        user.check_password(password, secret)?;
-        Ok(user)
+        conn.transaction::<User, GrpcStatus, _>(|conn| {
+            let user: User = t_users
+                .find(uid)
+                .first(conn)
+                .map_err(map_not_found("user", uid))?;
+            user.check_password(password, secret)?;
+            diesel::update(t_users.find(uid))
+                .set(last_login.eq(chrono::Local::now().naive_local()))
+                .execute(conn)
+                .map_err(map_not_found("user", uid))?;
+            Ok(user)
+        })
     }
 
     pub(in crate::user::domain) fn check_password(
@@ -366,7 +390,6 @@ impl User {
         conn: &mut PgConnection,
     ) -> GrpcResult<()> {
         use migration::t_oauth::dsl::*;
-
         match self.oauth_id {
             None => {
                 conn.transaction::<(), GrpcStatus, _>(|conn| {
@@ -380,7 +403,7 @@ impl User {
                         .map_err(|e| internal!(format!("Cannot create a new oauth, err: {}", e)))?;
                     self.oauth_id = Some(oid);
                     diesel::update(t_users::table.find(self.id))
-                        .set((t_users::oauth_id.eq(oid), t_users::update_at.eq(NaiveDateTime::default())))
+                        .set((t_users::oauth_id.eq(oid), t_users::update_at.eq(chrono::Local::now().naive_local())))
                         .execute(conn)
                         .map_err(|e| internal!(format!("Cannot create a new oauth, err: {}", e)))?;
                     Ok(())
