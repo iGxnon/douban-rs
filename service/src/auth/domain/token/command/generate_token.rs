@@ -11,7 +11,7 @@ use tracing::instrument;
 #[instrument(skip_all, err)]
 async fn execute(
     req: pb::GenerateTokenReq,
-    service_domain: &str,
+    domain: &str,
     encode_key: &EncodingKey,
     algorithm: Algorithm,
     refresh_ratio: f32,
@@ -24,7 +24,7 @@ async fn execute(
         TokenKind::Access,
         req.jti(),
         req.payload.clone(),
-        service_domain,
+        domain,
         encode_key,
         algorithm,
         refresh_ratio,
@@ -38,7 +38,7 @@ async fn execute(
         TokenKind::Refresh,
         req.jti(),
         req.payload,
-        service_domain,
+        domain,
         encode_key,
         algorithm,
         refresh_ratio,

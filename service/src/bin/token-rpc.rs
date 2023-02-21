@@ -1,4 +1,3 @@
-use common::infra::Resolver;
 use common::utils::{config_tips, parse_config};
 use service::auth::domain::token::TokenResolver;
 
@@ -6,7 +5,7 @@ use service::auth::domain::token::TokenResolver;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let config = parse_config(TokenResolver::DOMAIN)
+    let config = parse_config::<TokenResolver>()
         .await
         .expect("Cannot parse config");
 

@@ -403,7 +403,10 @@ impl User {
                         .map_err(|e| internal!(format!("Cannot create a new oauth, err: {}", e)))?;
                     self.oauth_id = Some(oid);
                     diesel::update(t_users::table.find(self.id))
-                        .set((t_users::oauth_id.eq(oid), t_users::update_at.eq(chrono::Local::now().naive_local())))
+                        .set((
+                            t_users::oauth_id.eq(oid),
+                            t_users::update_at.eq(chrono::Local::now().naive_local()),
+                        ))
                         .execute(conn)
                         .map_err(|e| internal!(format!("Cannot create a new oauth, err: {}", e)))?;
                     Ok(())

@@ -1,0 +1,25 @@
+---
+service_conf:
+  service:
+    name: spotless-liquid
+    listen_addr: 0.0.0.0:5001
+    discover_addr: http://127.0.0.1:5001
+    timeout: 30
+    concurrency_limit: 5120
+    load_shed: false
+  cert_file:
+  key_file:
+etcd:
+  user:
+  endpoints:
+    - 127.0.0.1:2379
+  keep_alive_while_idle: true
+cookie_conf:
+  max_age: 172800
+  http_only: true
+  secure: true
+  same_site: none
+  path: "/"
+  domain: ''
+  # encrypted: KDb9dTkUv5fdf0HAoZygs61wZvY0NC5pVh6zprv3SsU=
+  cookie_name: x-token

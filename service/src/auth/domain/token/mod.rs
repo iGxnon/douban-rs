@@ -70,7 +70,7 @@ pub struct TokenResolver {
 
 impl Resolver for TokenResolver {
     const TARGET: Target = Target::GRPC;
-    const DOMAIN: &'static str = "token-rpc";
+    const DOMAIN: &'static str = "token";
     type Config = TokenConfig;
 
     fn conf(&self) -> &Self::Config {
@@ -106,8 +106,9 @@ impl TokenResolver {
             self.conf.etcd.clone(),
             self.conf.service_conf.service.clone(),
         );
+        let service_key = Self::service_key();
         registry
-            .register_service(Self::DOMAIN)
+            .register_service(&service_key)
             .await
             .expect("cannot register service into etcd");
     }

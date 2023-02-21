@@ -12,32 +12,14 @@ pub mod layer {
     use http::{HeaderMap, Request, Response};
     use once_cell::sync::OnceCell;
     use proto::pb::auth::token::v1::token_service_client::TokenServiceClient;
-    use serde::{Deserialize, Serialize};
-    use std::future::Future;
     use std::marker::PhantomData;
     use std::sync::Arc;
     use tonic::transport::Channel;
 
     static CLIENT: OnceCell<TokenServiceClient<Channel>> = OnceCell::new();
-    static KEY: OnceCell<Key> = OnceCell::new();
+    pub static KEY: OnceCell<Key> = OnceCell::new();
 
     const DEFAULT_REALM: &str = "app-http-auth";
-
-    fn default_etcd() -> Option<EtcdConf> {
-        Some(EtcdConf::default())
-    }
-
-    #[derive(Deserialize, Serialize, Clone, Debug)]
-    pub struct AuthConf {
-        #[serde(default = "default_etcd")]
-        pub etcd: Option<EtcdConf>,
-        #[serde(default)]
-        pub cookie_conf: Option<CookieAuthConf>,
-        #[serde(default)]
-        pub bearer_header: Option<String>,
-        #[serde(default)]
-        pub www_auth: WWWAuth,
-    }
 
     pub trait IdentityProvider: Clone {
         // Id, Group, Extra are used to identify whom the token refer to.
@@ -48,60 +30,102 @@ pub mod layer {
         type Extra: TryFrom<String> + Send + Sync + 'static;
     }
 
-    impl Default for AuthConf {
-        fn default() -> Self {
-            Self {
-                etcd: default_etcd(),
-                cookie_conf: Some(CookieAuthConf::default()),
-                bearer_header: Some(http::header::AUTHORIZATION.to_string()),
-                www_auth: Default::default(),
-            }
-        }
-    }
-
     /// Used for generating unauthorized header [WWW_AUTH_BASIC], [WWW_AUTH_BEARER], [WWW_AUTH_COOKIE]
-    #[derive(Deserialize, Serialize, Clone, Debug)]
-    pub struct WWWAuth {
-        #[serde(default)]
-        bearer: Option<String>,
-        #[serde(default)]
-        cookie: Option<String>,
-    }
+    pub struct WWWAuth(String);
 
     impl WWWAuth {
         pub fn bearer(realm: &str) -> Self {
-            Self {
-                bearer: Some(format!(r#"Bearer realm={},charset=UTF-8"#, realm)),
-                cookie: None,
-            }
+            Self(format!(r#"Bearer realm={},charset=UTF-8"#, realm))
         }
 
         pub fn cookie(realm: &str, cookie_name: &str) -> Self {
-            Self {
-                bearer: None,
-                cookie: Some(format!(
-                    r#"Cookie realm={},charset=UTF-8,cookie-name={}"#,
-                    realm, cookie_name
-                )),
-            }
+            Self(format!(
+                r#"Cookie realm={},charset=UTF-8,cookie-name={}"#,
+                realm, cookie_name
+            ))
         }
     }
 
-    impl Default for WWWAuth {
-        fn default() -> Self {
+    pub struct AuthBuilder {
+        etcd: EtcdConf,
+        method: method::Method,
+    }
+
+    impl AuthBuilder {
+        pub fn cookie(etcd: EtcdConf) -> Self {
             Self {
-                bearer: Some(format!(r#"Bearer realm={},charset=UTF-8"#, DEFAULT_REALM)),
-                cookie: Some(format!(
-                    r#"Cookie realm={},charset=UTF-8,cookie-name={}"#,
-                    DEFAULT_REALM, DEFAULT_COOKIE_NAME,
-                )),
+                etcd,
+                method: method::Method::CookieAuth {
+                    www: Arc::new(WWWAuth::cookie(DEFAULT_REALM, DEFAULT_COOKIE_NAME).0),
+                    auth_conf: Default::default(),
+                },
+            }
+        }
+
+        pub fn bearer(etcd: EtcdConf) -> Self {
+            Self {
+                etcd,
+                method: method::Method::BearerAuth {
+                    www: Arc::new(WWWAuth::bearer(DEFAULT_REALM).0),
+                    header: Arc::new("".to_string()),
+                },
+            }
+        }
+
+        pub fn cookie_conf(mut self, conf: CookieAuthConf) -> Self {
+            if let method::Method::CookieAuth { auth_conf, .. } = &mut self.method {
+                *auth_conf = conf;
+            }
+            self
+        }
+
+        pub fn bearer_header(mut self, bearer_header: &str) -> Self {
+            if let method::Method::BearerAuth { header, .. } = &mut self.method {
+                *header = Arc::new(bearer_header.to_string());
+            }
+            self
+        }
+
+        pub fn www(mut self, www_auth: WWWAuth) -> Self {
+            if let method::Method::CookieAuth { www, .. } = &mut self.method {
+                *www = Arc::new(www_auth.0.clone());
+            }
+            self
+        }
+
+        pub fn www_str(mut self, www_auth: &str) -> Self {
+            if let method::Method::CookieAuth { www, .. } = &mut self.method {
+                *www = Arc::new(www_auth.to_string());
+            }
+            self
+        }
+
+        pub async fn finish<I: IdentityProvider, ResBody>(self) -> Auth<I, ResBody> {
+            let (channel, tx) = Channel::balance_channel(64);
+            let discover = EtcdRegistry::discover(self.etcd);
+            let service_key = TokenResolver::service_key();
+            discover
+                .discover_to_channel(&service_key, tx)
+                .await
+                .expect("Cannot connect to auth service.");
+            CLIENT
+                .try_insert(TokenServiceClient::new(channel))
+                .expect("Cannot connect twice.");
+            if let method::Method::CookieAuth {ref auth_conf, ..} = self.method {
+                if let Some(ref key) = auth_conf.encrypted {
+                    KEY.try_insert(Key::derive_from(key.as_bytes()))
+                        .unwrap_or_else(|_| panic!("Cannot create cookie key"));
+                }
+            }
+            Auth {
+                method: self.method,
+                _data: Default::default(),
             }
         }
     }
 
     pub struct Auth<I: IdentityProvider, ResBody> {
         method: method::Method,
-        conf: AuthConf,
         _data: PhantomData<(ResBody, I)>,
     }
 
@@ -109,75 +133,8 @@ pub mod layer {
         fn clone(&self) -> Self {
             Self {
                 method: self.method.clone(),
-                conf: self.conf.clone(),
                 _data: Default::default(),
             }
-        }
-    }
-
-    pub trait AuthMethod<B, ResBody, I: IdentityProvider>: Clone {
-        type ReqBody;
-        type Fut: Future<
-            Output = Result<(Request<Self::ReqBody>, Option<HeaderMap>), Response<ResBody>>,
-        >;
-        fn auth(
-            &self,
-            client: TokenServiceClient<Channel>,
-            cookie_conf: AuthConf,
-            req: Request<B>,
-        ) -> Self::Fut;
-    }
-
-    impl<ResBody, I: IdentityProvider> Auth<I, ResBody> {
-        pub async fn cookie(mut conf: AuthConf) -> Self {
-            // reduce clone cost
-            conf.www_auth.bearer.take();
-            conf.bearer_header.take();
-            debug_assert!(conf.cookie_conf.is_some());
-            Self {
-                method: method::Method::CookieAuth(Arc::new(
-                    conf.www_auth
-                        .cookie
-                        .take()
-                        .expect("Require www_auth.cookie to be represented"),
-                )),
-                conf,
-                _data: PhantomData,
-            }
-            .connect()
-            .await
-        }
-
-        pub async fn bearer(mut conf: AuthConf) -> Self {
-            // reduce clone cost
-            conf.www_auth.cookie.take();
-            conf.cookie_conf.take();
-            debug_assert!(conf.bearer_header.is_some());
-            Self {
-                method: method::Method::BearerAuth(Arc::new(
-                    conf.www_auth
-                        .bearer
-                        .take()
-                        .expect("Require www_auth.bearer to be represented"),
-                )),
-                conf,
-                _data: PhantomData,
-            }
-            .connect()
-            .await
-        }
-
-        async fn connect(mut self) -> Self {
-            let (channel, tx) = Channel::balance_channel(64);
-            let discover = EtcdRegistry::discover(self.conf.etcd.take().unwrap());
-            discover
-                .discover_to_channel(TokenResolver::DOMAIN, tx)
-                .await
-                .expect("Cannot connect to auth service.");
-            CLIENT
-                .try_insert(TokenServiceClient::new(channel))
-                .expect("Cannot connect twice.");
-            self
         }
     }
 
@@ -195,10 +152,10 @@ pub mod layer {
         type Future = BoxFut<B, ResBody>;
 
         fn authorize(&mut self, req: Request<B>) -> Self::Future {
-            let method = &self.method;
+            let method = self.method.clone();
             let client = CLIENT.get().expect("Not connect.").clone();
 
-            method.auth::<I, _, _>(client, self.conf.clone(), req)
+            method.auth::<I, _, _>(client, req)
         }
     }
 
@@ -217,8 +174,14 @@ pub mod layer {
 
         #[derive(Clone)]
         pub enum Method {
-            CookieAuth(Arc<String>),
-            BearerAuth(Arc<String>),
+            CookieAuth {
+                www: Arc<String>,
+                auth_conf: CookieAuthConf,
+            },
+            BearerAuth {
+                www: Arc<String>,
+                header: Arc<String>,
+            },
         }
 
         fn expect_two<I: Iterator>(mut split: I) -> Result<(I::Item, I::Item), StatusCode> {
@@ -257,7 +220,7 @@ pub mod layer {
                         .ok_or(StatusCode::UNAUTHORIZED)?
                         .clone(),
                     Some(key) => {
-                        let key = KEY.get_or_init(|| Key::derive_from(key.as_bytes()));
+                        let key = KEY.get().expect("Cookie key is not initialized");
                         cookie_jar
                             .private(key)
                             .get(&conf.cookie_name)
@@ -295,6 +258,7 @@ pub mod layer {
                         .map_err(|e| e.code().to_http_code())?
                         .into_inner();
 
+                    // TODO: Make cookie authorization safer?
                     let cookie = Cookie::build(
                         conf.cookie_name,
                         format!(
@@ -405,57 +369,46 @@ pub mod layer {
         }
 
         impl Method {
-            pub(crate) fn auth<I: IdentityProvider, B: Send + 'static, ResBody: Default + Send>(
-                &self,
+            pub(super) fn auth<I: IdentityProvider, B: Send + 'static, ResBody: Default + Send>(
+                self,
                 client: TokenServiceClient<Channel>,
-                conf: AuthConf,
                 req: Request<B>,
             ) -> BoxFut<B, ResBody> {
-                let method = self.clone();
                 Box::pin(async move {
-                    let res = match method {
-                        Method::CookieAuth(_) => Method::cookie_auth::<I, _>(
-                            client,
-                            conf.cookie_conf.expect("Must configure cookie_conf"),
-                            req,
-                        )
-                        .await
-                        .map(|(req, cookies)| match cookies {
-                            None => (req, None),
-                            Some(cookie_jar) => {
-                                let mut header_map = HeaderMap::new();
-                                write_cookie(&mut header_map, &cookie_jar);
-                                (req, Some(header_map))
-                            }
-                        }),
-                        Method::BearerAuth(_) => {
+                    let (res, www) = match self {
+                        Method::CookieAuth { auth_conf, www } => (
+                            Method::cookie_auth::<I, _>(client, auth_conf, req)
+                                .await
+                                .map(|(req, cookies)| match cookies {
+                                    None => (req, None),
+                                    Some(cookie_jar) => {
+                                        let mut header_map = HeaderMap::new();
+                                        write_cookie(&mut header_map, &cookie_jar);
+                                        (req, Some(header_map))
+                                    }
+                                }),
+                            www,
+                        ),
+                        Method::BearerAuth { header, www } => (
                             Method::bearer_auth::<I, _>(
                                 client,
-                                conf.bearer_header
-                                    .expect("Must configure bearer_header")
+                                header
                                     .as_str()
                                     .parse()
                                     .expect("Not a valid bearer http header"),
                                 req,
                             )
-                            .await
-                        }
+                            .await,
+                            www,
+                        ),
                     };
-                    match res {
-                        Ok(req) => Ok(req),
-                        Err(code) => match method {
-                            Method::CookieAuth(www) => Err(Response::builder()
-                                .status(code)
-                                .header(header::WWW_AUTHENTICATE, www.as_str())
-                                .body(ResBody::default())
-                                .unwrap()),
-                            Method::BearerAuth(www) => Err(Response::builder()
-                                .status(code)
-                                .header(header::WWW_AUTHENTICATE, www.as_str())
-                                .body(ResBody::default())
-                                .unwrap()),
-                        },
-                    }
+                    res.map_err(|code| {
+                        Response::builder()
+                            .status(code)
+                            .header(header::WWW_AUTHENTICATE, www.as_str())
+                            .body(ResBody::default())
+                            .unwrap()
+                    })
                 })
             }
         }

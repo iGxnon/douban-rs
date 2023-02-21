@@ -2,8 +2,8 @@
 service_conf:
   service:
     name: aggressive-point
-    listen_addr: 0.0.0.0:3000
-    discover_addr: http://127.0.0.1:3000
+    listen_addr: 0.0.0.0:3001
+    discover_addr: http://127.0.0.1:3001
     timeout: 30
     concurrency_limit: 5120
     load_shed: false
@@ -15,3 +15,5 @@ etcd:
     - 127.0.0.1:2379
   user:
   keep_alive_while_idle: true
+hash_secret: KDb9dTkUv5fdf0HAoZygs61wZvY0NC5pVh6zprv3SsU=
+pg_dsn: postgres://igxnon:@localhost/s_douban_rs

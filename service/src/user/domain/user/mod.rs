@@ -13,7 +13,6 @@ use common::infra::{Resolver, Target};
 use common::registry::{EtcdRegistry, ServiceDiscover, ServiceRegister};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
-use once_cell::sync::OnceCell;
 use proto::pb::auth::token::v1::token_service_client::TokenServiceClient;
 use proto::pb::user::sys::v1::user_service_server::UserServiceServer;
 use r2d2::PooledConnection;
@@ -63,11 +62,10 @@ impl Default for UserConfig {
 
 type Register<T> = common::config::register::Register<UserConfig, T>;
 
-static TOKEN_SRV: OnceCell<TokenServiceClient<Channel>> = OnceCell::new();
-
 #[derive(Clone)]
 pub struct UserResolver {
     conf: UserConfig,
+    token_client: TokenServiceClient<Channel>,
     hash_secret: Register<&'static String>,
     pg_pool: Register<&'static Pool<ConnectionManager<PgConnection>>>,
 }
@@ -75,7 +73,7 @@ pub struct UserResolver {
 impl Resolver for UserResolver {
     const TARGET: Target = Target::GRPC;
 
-    const DOMAIN: &'static str = "user-rpc";
+    const DOMAIN: &'static str = "user";
 
     type Config = UserConfig;
 
@@ -102,28 +100,21 @@ impl RoleGroup {
 
 impl UserResolver {
     pub async fn new(conf: UserConfig) -> Self {
+        let (channel, tx) = Channel::balance_channel(64);
+        let discover = EtcdRegistry::discover(conf.etcd.clone());
+        let service_key = TokenResolver::service_key();
+        discover
+            .discover_to_channel(&service_key, tx)
+            .await
+            .expect("Cannot connect to etcd service.");
         Self {
             conf,
+            token_client: TokenServiceClient::new(channel),
             hash_secret: Register::once_ref(|conf| conf.hash_secret.clone()),
             pg_pool: Register::once_ref(|conf| {
                 Pool::new(ConnectionManager::new(&conf.pg_dsn)).unwrap()
             }),
         }
-        .connect()
-        .await
-    }
-
-    async fn connect(self) -> Self {
-        let (channel, tx) = Channel::balance_channel(64);
-        let discover = EtcdRegistry::discover(self.conf.etcd.clone());
-        discover
-            .discover_to_channel(TokenResolver::DOMAIN, tx)
-            .await
-            .expect("Cannot connect to token service.");
-        TOKEN_SRV
-            .try_insert(TokenServiceClient::new(channel))
-            .expect("Cannot connect twice.");
-        self
     }
 
     pub fn hash_secret(&self) -> &str {
@@ -137,10 +128,7 @@ impl UserResolver {
     }
 
     pub fn token_client(&self) -> TokenServiceClient<Channel> {
-        TOKEN_SRV
-            .get()
-            .expect("Token service not connected.")
-            .clone()
+        self.token_client.clone()
     }
 
     pub async fn register_service(&self) {
@@ -148,8 +136,9 @@ impl UserResolver {
             self.conf.etcd.clone(),
             self.conf.service_conf.service.clone(),
         );
+        let service_key = Self::service_key();
         registry
-            .register_service(Self::DOMAIN)
+            .register_service(&service_key)
             .await
             .expect("Cannot register service into etcd");
     }
@@ -188,6 +177,10 @@ impl UserResolver {
             })
             .add_service(UserServiceServer::new(token_srv));
 
-        serve.serve(addr).await
+        serve
+            .serve_with_shutdown(addr, async {
+                let _ = tokio::signal::ctrl_c().await;
+            })
+            .await
     }
 }

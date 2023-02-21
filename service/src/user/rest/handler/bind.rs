@@ -10,7 +10,7 @@ pub(crate) async fn handle(
     }): Form<BindReq>,
 ) -> (StatusCode, Json<Resp<()>>) {
     let resp = resolver
-        .user_service()
+        .user_client()
         .bind(pb::BindReq {
             identifier: uid.as_string(),
             email,

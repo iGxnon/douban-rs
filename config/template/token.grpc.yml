@@ -1,16 +1,21 @@
 ---
 service_conf:
   service:
-    name: spotless-liquid
+    name: youthful-boy
     listen_addr: 0.0.0.0:3000
     discover_addr: http://127.0.0.1:3000
     timeout: 30
     concurrency_limit: 5120
     load_shed: false
-  cert_file:
-  key_file:
+  health_check: false
+redis:
+  dsn: redis://127.0.0.1/
 etcd:
+  user:
   endpoints:
     - 127.0.0.1:2379
-  user:
   keep_alive_while_idle: true
+oct_key: LUUipMfwwxzH566a5hsAfI5TAnQVlKJOK5+Eq809vIM=
+refresh_ratio: 3
+expires:
+  user: 167800

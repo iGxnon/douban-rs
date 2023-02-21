@@ -1,6 +1,7 @@
 use crate::user::domain::user::UserResolver;
 use crate::user::rest::error::handle_error;
 use axum::error_handling::HandleErrorLayer;
+use common::config::layer::LayerConfig;
 use common::config::middleware::MiddlewareConfig;
 use common::config::service::ServiceConfig;
 use common::config::Config;
@@ -25,17 +26,19 @@ pub struct RestConfig {
     pub service_conf: <Config as ServiceConfig>::RestService,
     #[serde(default)]
     pub etcd: <Config as MiddlewareConfig>::Etcd,
+    #[serde(default)]
+    pub cookie_conf: <Config as LayerConfig>::CookieAuth,
 }
 
 #[derive(Clone)]
 pub struct RestResolver {
     conf: RestConfig,
-    user_service: UserServiceClient<Channel>,
+    user_client: UserServiceClient<Channel>,
 }
 
 impl Resolver for RestResolver {
     const TARGET: Target = Target::REST;
-    const DOMAIN: &'static str = "user-rest";
+    const DOMAIN: &'static str = "user";
     type Config = RestConfig;
 
     fn conf(&self) -> &Self::Config {
@@ -47,16 +50,17 @@ impl RestResolver {
     pub async fn new(conf: RestConfig) -> Self {
         let registry = EtcdRegistry::discover(conf.etcd.clone());
         let (channel, tx) = Channel::balance_channel(1024);
+        let service_key = UserResolver::service_key();
         registry
-            .discover_to_channel(UserResolver::DOMAIN, tx)
+            .discover_to_channel(&service_key, tx)
             .await
             .expect("Cannot discover user service to channel");
-        let user_service = UserServiceClient::new(channel);
-        Self { conf, user_service }
+        let user_client = UserServiceClient::new(channel);
+        Self { conf, user_client }
     }
 
-    pub fn user_service(&self) -> UserServiceClient<Channel> {
-        self.user_service.clone()
+    pub fn user_client(&self) -> UserServiceClient<Channel> {
+        self.user_client.clone()
     }
 
     pub async fn serve(&self) {
@@ -80,6 +84,9 @@ impl RestResolver {
                     )
                     .into_make_service(),
             )
+            .with_graceful_shutdown(async {
+                let _ = tokio::signal::ctrl_c().await;
+            })
             .await
             .unwrap();
     }

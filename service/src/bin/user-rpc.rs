@@ -1,4 +1,3 @@
-use common::infra::Resolver;
 use common::utils::{config_tips, parse_config};
 use service::user::domain::user::UserResolver;
 
@@ -6,7 +5,7 @@ use service::user::domain::user::UserResolver;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let config = parse_config(UserResolver::DOMAIN)
+    let config = parse_config::<UserResolver>()
         .await
         .expect("Cannot parse config");
 

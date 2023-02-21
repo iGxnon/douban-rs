@@ -5,7 +5,7 @@ pub(crate) async fn handle(
     Form(RegisterReq { username, password }): Form<RegisterReq>,
 ) -> (StatusCode, Json<Resp<()>>) {
     let resp = resolver
-        .user_service()
+        .user_client()
         .register(pb::RegisterReq { username, password })
         .await
         .map(|_| ())
