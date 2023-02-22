@@ -1272,9 +1272,9 @@ dependencies = [
 
 [[package]]
 name = "kosei"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3172fbd99828c119ef6dd5f200f1ba1fb012acc28a2e22809f485dcf2a87eda2"
+checksum = "1af93cfd28a36d911fe02358ef91f9b94a199fe2be35eed9c708a687b6311cf0"
 dependencies = [
  "base64 0.20.0",
  "hmac",

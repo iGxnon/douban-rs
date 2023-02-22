@@ -6,16 +6,19 @@ use crate::user::rest::types::IdProvider;
 use crate::user::rest::RestResolver;
 use axum::routing::post;
 use axum::Router;
+use common::infra::Resolver;
 use common::layer::AsyncHttpAuthLayer;
 use std::sync::Arc;
 use tower::ServiceBuilder;
-use common::infra::Resolver;
 
 impl RestResolver {
     pub async fn make_router(&self) -> Router {
         let auth = AuthBuilder::cookie(self.conf.etcd.clone())
             .cookie_conf(self.conf.cookie_conf.clone())
-            .www(WWWAuth::cookie(Self::DOMAIN, self.conf.cookie_conf.cookie_name.as_str()))
+            .www(WWWAuth::cookie(
+                Self::DOMAIN,
+                self.conf.cookie_conf.cookie_name.as_str(),
+            ))
             .finish::<IdProvider, _>()
             .await;
         let bind_router = Router::new()

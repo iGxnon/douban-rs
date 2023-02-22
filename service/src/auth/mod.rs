@@ -111,7 +111,7 @@ pub mod layer {
             CLIENT
                 .try_insert(TokenServiceClient::new(channel))
                 .expect("Cannot connect twice.");
-            if let method::Method::CookieAuth {ref auth_conf, ..} = self.method {
+            if let method::Method::CookieAuth { ref auth_conf, .. } = self.method {
                 if let Some(ref key) = auth_conf.encrypted {
                     KEY.try_insert(Key::derive_from(key.as_bytes()))
                         .unwrap_or_else(|_| panic!("Cannot create cookie key"));

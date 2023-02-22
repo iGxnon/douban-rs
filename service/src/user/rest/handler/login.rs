@@ -1,9 +1,9 @@
 use super::*;
-use cookie::{Cookie, CookieJar};
-use cookie::time::Duration;
-use http::HeaderMap;
-use common::layer::write_cookie;
 use crate::auth::layer::KEY;
+use common::layer::write_cookie;
+use cookie::time::Duration;
+use cookie::{Cookie, CookieJar};
+use http::HeaderMap;
 
 pub(crate) async fn handle(
     State(resolver): State<Arc<RestResolver>>,

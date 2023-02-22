@@ -1,4 +1,5 @@
 use axum::Router;
+use common::config::env::require;
 use common::utils::parse_config;
 use service::user::rest::{RestConfig, RestResolver};
 
@@ -10,12 +11,11 @@ async fn main() {
     let conf: RestConfig = parse_config::<RestResolver>()
         .await
         .expect("Cannot parse config");
-    let addr = conf.service_conf.service.listen_addr.clone();
     let rest_resolver = RestResolver::new(conf).await;
 
     let route = rest_resolver.make_router().await;
 
-    serve(&addr, Router::new().merge(route)).await
+    serve(&require("APP_ADDR"), Router::new().merge(route)).await
 }
 
 pub async fn serve(listen_addr: &str, route: Router) {
