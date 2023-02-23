@@ -21,7 +21,7 @@ Rust 强大的抽象能力给构建后端项目提供了很多种可能，导致
 
 防止过度抽象带来的重构复杂，以上则是最基本的设计思路
 
-## Isn't Resolver A God Object？
+### Isn't Resolver A God Object？
 
 来自 https://github.com/KodrAus/rust-web-app#isnt-resolver-a-god-object 
 
@@ -31,3 +31,30 @@ Rust 强大的抽象能力给构建后端项目提供了很多种可能，导致
 
 我这里将 Resolver 下沉到了每一个 domain，与 rust-web-app 中不一样的是，我构建的是微服务架构的程序，各个 Resolver 之间可以没有关系，这减小了单个 Resolver 的体量。对于一个 domain 来说，它最主要的部分也只是几个 execute 函数的集合，单个 Resolver 主要服务好这几个函数即可。而 domain 体量逐渐膨胀后，应该考虑划分新的 domain 了，而不会对 Resolver 的体量有影响
 
+## 细节
+
+总体上，整个项目分为 4 个 crate 
+
+- cli           ———— 便于快速部署的脚本(WIP)
+- common-rs     ———— 通用包/基础脚手架
+- migration     ———— 关系数据库ORM对象声明/表结构迁移
+- proto         ———— 服务间通信协议(IDL)定义
+- service       ———— 服务
+
+对于 service crate，分成各个"广域"，例如 `auth`，`user`，每个广域下可以有多个"辖域"，这样可以一定程度来控制不同域之间的访问权限。例如可以控制 `user` 广域下的"用户基础信息资源"公开到全域中，各个广域均可访问，而一些隐私信息可以只公开到 `user` 广域下的辖域访问。
+
+每个广域都可以暴露 API，各类 API 会以不同的风格划分到对应的包下，例如 `restful` 风格的 API 会被划分到广域下的 `rest` 包下，`protobuf`、 `thrift ` 等服务间通信的 API 将会被划分到 `rpc` 包下，`graphql` 风格的 API 会被划分到 `graphql` 文件夹下等等。至于每类 API 可以暴露的数量、可以暴露多少种 API、每类 API 是直接对接辖域还是翻译自其他 API，这取决于实际需求，例如 `auth` 广域我只暴露了一个 `rpc` 形式的 `api`，因为我不需要客户端直接访问 `auth`，而是让服务去访问；`user` 广域的 `rest` API，它的实现只是翻译 gRPC 的 API，因为我不仅仅需要客户端访问 `user` 下的辖域，也需要其他的服务也可以访问。
+
+每个辖域可分为三个子包
+
+- command    ———— 将 command 请求对接到 model 中
+- query    ———— 将 query 请求对接到 model 中
+- model    ———— 领域模型
+
+`command` 和 `query` 的任务比较简单，主要为：`参数检查`，`依赖注入` 和 `对接领域模型`，我希望所有的逻辑都最好只在领域模型中，这样做的好处是避免逻辑分散到各层之中，难以把握全局逻辑关系。缺点就是领域模型可能会变得异常庞大，需要经常重构，需要编码者有一定的抽象和解耦能力。
+
+这也称为 `DDD(Domain-Driven Design)`
+
+### PS:
+
+其实这样设计的话，单体服务架构是微服务架构一个特例，即只有一个广域，广域暴露的 API 是面向客户端的（`rest` 和 `graphql` 等）。
