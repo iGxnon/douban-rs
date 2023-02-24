@@ -1,4 +1,4 @@
-use crate::auth::domain::token::TokenResolver;
+use crate::auth::rpc::TokenResolver;
 use common::infra::*;
 use proto::pb::auth::token::v1::*;
 use proto::pb::common::v1::EmptyRes;

@@ -1,11 +1,10 @@
 use crate::user::domain::user::model::user::User;
+use crate::user::rpc::{RoleGroup, UserResolver};
 use common::{infra::Command, status::prelude::*};
 use diesel::PgConnection;
 use proto::pb::common::v1::EmptyRes;
 use proto::pb::user::sys::v1 as pb;
 use std::ops::DerefMut;
-
-use crate::user::domain::user::{RoleGroup, UserResolver};
 
 #[tracing::instrument(skip_all, err)]
 async fn execute(

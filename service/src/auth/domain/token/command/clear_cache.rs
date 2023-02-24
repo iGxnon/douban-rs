@@ -1,5 +1,5 @@
 use crate::auth::domain::token::model::token::{Token, TokenKind};
-use crate::auth::domain::token::TokenResolver;
+use crate::auth::rpc::TokenResolver;
 use common::infra::*;
 use common::status::ext::GrpcResult;
 use proto::pb::auth::token::v1 as pb;

@@ -1,12 +1,11 @@
-use common::infra::Command;
+use crate::user::rpc::UserResolver;
+use common::infra::*;
 use proto::pb::common::v1::EmptyRes;
 use proto::pb::user::sys::v1::user_service_server;
 use proto::pb::user::sys::v1::*;
 use tonic::{Request, Response, Status};
 
-use crate::user::domain::user::UserResolver;
-
-pub struct UserService(pub(crate) UserResolver);
+pub struct UserService(pub UserResolver);
 
 #[tonic::async_trait]
 impl user_service_server::UserService for UserService {

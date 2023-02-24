@@ -2,7 +2,7 @@ pub mod domain;
 pub mod rpc;
 
 pub mod layer {
-    use super::domain::token::TokenResolver;
+    use crate::auth::rpc::TokenResolver;
     use common::infra::Resolver;
     use common::layer::{AsyncAuth, CookieAuthConf, DEFAULT_COOKIE_NAME};
     use common::middleware::etcd::EtcdConf;

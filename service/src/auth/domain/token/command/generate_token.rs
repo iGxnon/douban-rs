@@ -1,5 +1,5 @@
 use crate::auth::domain::token::model::token::{Token, TokenKind};
-use crate::auth::domain::token::TokenResolver;
+use crate::auth::rpc::TokenResolver;
 use common::infra::*;
 use common::status::ext::GrpcResult;
 use jsonwebtoken::{Algorithm, EncodingKey};
@@ -60,8 +60,8 @@ impl TokenResolver {
                 Self::DOMAIN,
                 self.encode_key(),
                 self.algorithm(),
-                self.conf.refresh_ratio,
-                &self.conf.expires,
+                self.conf().refresh_ratio,
+                &self.conf().expires,
                 self.redis_conn().deref_mut(),
             )
             .await

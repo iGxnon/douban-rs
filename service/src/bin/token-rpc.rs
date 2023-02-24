@@ -1,5 +1,5 @@
 use common::utils::{config_tips, parse_config};
-use service::auth::domain::token::TokenResolver;
+use service::auth::rpc::TokenResolver;
 
 #[tokio::main]
 async fn main() {

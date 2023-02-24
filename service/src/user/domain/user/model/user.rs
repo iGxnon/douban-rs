@@ -1,5 +1,5 @@
 use crate::user::domain::user::model::oauth::{GithubId, NewOAuth, PutOAuth};
-use crate::user::domain::user::{RoleGroup, UserResolver};
+use crate::user::rpc::{RoleGroup, UserResolver};
 use base64::Engine;
 use chrono::NaiveDateTime;
 use common::infra::Resolver;
@@ -89,7 +89,6 @@ fn hash_password(secret: &str, password: &str) -> String {
     base64::prelude::BASE64_STANDARD.encode(output)
 }
 
-/// TODO cached
 impl User {
     pub(in crate::user::domain) fn register(
         name: &str,

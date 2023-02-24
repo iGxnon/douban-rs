@@ -1,5 +1,5 @@
 use crate::auth::domain::token::model::token::{Token, TokenKind};
-use crate::auth::domain::token::TokenResolver;
+use crate::auth::rpc::TokenResolver;
 use common::infra::Command;
 use common::invalid_argument;
 use common::status::ext::GrpcResult;

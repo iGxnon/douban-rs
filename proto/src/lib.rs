@@ -45,7 +45,7 @@ pub mod pb {
 macro_rules! impl_args {
     (
         $(
-            ($proj:ident, $domain:ident, $ver:ident) {
+            $ty:ident($proj:ident, $domain:ident, $ver:ident) {
                 $(
                     ($req:ident, $res:ident);
                 )+
@@ -54,7 +54,7 @@ macro_rules! impl_args {
     ) => {
         $(
             $(
-                impl common::infra::Args for pb::$proj::$domain::$ver::$req {
+                impl common::infra::$ty for pb::$proj::$domain::$ver::$req {
                     type Output = Result<pb::$proj::$domain::$ver::$res, common::status::ext::GrpcStatus>;
                 }
             )+
@@ -62,6 +62,7 @@ macro_rules! impl_args {
     };
 }
 
+/// empty response must be a command
 macro_rules! impl_empty_res {
     (
         $(
@@ -74,7 +75,7 @@ macro_rules! impl_empty_res {
     ) => {
         $(
             $(
-                impl common::infra::Args for pb::$proj::$domain::$ver::$req {
+                impl common::infra::CommandArgs for pb::$proj::$domain::$ver::$req {
                     type Output = Result<pb::common::v1::EmptyRes, common::status::ext::GrpcStatus>;
                 }
             )+
@@ -83,14 +84,15 @@ macro_rules! impl_empty_res {
 }
 
 impl_args! {
-    (auth, token, v1) {
-        (ParseTokenReq, ParseTokenRes);
+    CommandArgs(auth, token, v1) {
         (GenerateTokenReq, GenerateTokenRes);
         (RefreshTokenReq, RefreshTokenRes);
-
     }
-    (user, sys, v1) {
+    QueryArgs(user, sys, v1) {
         (LoginReq, LoginRes);
+    }
+    QueryArgs(auth, token, v1) {
+        (ParseTokenReq, ParseTokenRes);
     }
 }
 

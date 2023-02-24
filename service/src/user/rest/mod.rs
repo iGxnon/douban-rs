@@ -1,5 +1,5 @@
-use crate::user::domain::user::UserResolver;
 use crate::user::rest::error::handle_error;
+use crate::user::rpc::UserResolver;
 use axum::error_handling::HandleErrorLayer;
 use common::config::layer::LayerConfig;
 use common::config::middleware::MiddlewareConfig;

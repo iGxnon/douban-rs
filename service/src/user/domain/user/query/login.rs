@@ -1,12 +1,11 @@
 use crate::user::domain::user::model::user::User;
-use common::{infra::Command, status::prelude::*};
+use crate::user::rpc::UserResolver;
+use common::{infra::Query, status::prelude::*};
 use diesel::PgConnection;
 use proto::pb::auth::token::v1::token_service_client::TokenServiceClient;
 use proto::pb::user::sys::v1 as pb;
 use std::ops::DerefMut;
 use tonic::transport::Channel;
-
-use crate::user::domain::user::UserResolver;
 
 #[tracing::instrument(skip_all, err)]
 async fn execute(
@@ -21,7 +20,7 @@ async fn execute(
 }
 
 impl UserResolver {
-    pub fn create_login(&self) -> impl Command<pb::LoginReq> + '_ {
+    pub fn create_login(&self) -> impl Query<pb::LoginReq> + '_ {
         move |req: pb::LoginReq| async move {
             execute(
                 req,

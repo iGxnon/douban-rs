@@ -1,5 +1,5 @@
 use common::utils::{config_tips, parse_config};
-use service::user::domain::user::UserResolver;
+use service::user::rpc::UserResolver;
 
 #[tokio::main]
 async fn main() {
