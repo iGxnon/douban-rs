@@ -1,3 +1,6 @@
 [submodule "common-rs"]
 	path = common-rs
 	url = git@github.com:LanshanTeam/common-rs.git
+[submodule "pkg/consul"]
+	path = pkg/consul
+	url = git@github.com:iGxnon/consul-rust.git
