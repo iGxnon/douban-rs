@@ -3,6 +3,7 @@ members = [
     "cli",
     "common-rs",
     "migration",
+    "pkg/*"
+,
     "proto",
-    "service",
-]
+    "service"]
