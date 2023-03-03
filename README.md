@@ -1,6 +1,6 @@
 ## douban-rs (WIP) 
 
-> 这是一个实验性项目，旨在完成 rust web 开发的最佳实践
+> 这是一个实验性项目，旨在探究 rust web 开发的最佳实践
 >
 > 使用 rust 对 [douban](https://github.com/mouse-douban/douban-web) 项目的后端进行重构
 
@@ -27,7 +27,7 @@ Rust 强大的抽象能力给构建后端项目提供了很多种可能，导致
 
 来自 https://github.com/KodrAus/rust-web-app#isnt-resolver-a-god-object 
 
-虽然在 OOP 编程中，推崇的是让一组对象相互协作式的工作，god object 是一个 bad design，但我写的是 rust 啊，连继承的特性都没有的 OOP 你跟我说什么？（bushi
+虽然在 OOP 编程中，推崇的是让一组对象相互协作式的工作，god object 是一个 bad design，但我写的是 rust 啊，连继承的特性都没有的 OOP 你跟我说什么？（逃
 
 参考了 `rust-web-app` 中的 Resolver，这个项目中，每一个领域 (`domain`) 都有一个 `Resolver`，在这个 domain 的各个地方都有 Resolver 的一些方法实现，所以这就让 Resolver 渐渐变成一个 god object？
 
@@ -45,7 +45,7 @@ Rust 强大的抽象能力给构建后端项目提供了很多种可能，导致
 
 对于 service crate，分成各个"广域"，例如 `auth`，`user`，每个广域下可以有多个"辖域"，这样可以一定程度来控制不同域之间的访问权限。例如可以控制 `user` 广域下的"用户基础信息资源"公开到全域中，各个广域均可访问，而一些隐私信息可以只公开到 `user` 广域下的辖域访问。
 
-每个广域都可以暴露 API，各类 API 会以不同的风格划分到对应的包下，例如 `restful` 风格的 API 会被划分到广域下的 `rest` 包下，`protobuf`、 `thrift ` 等服务间通信的 API 将会被划分到 `rpc` 包下，`graphql` 风格的 API 会被划分到 `graphql` 文件夹下等等。至于每类 API 可以暴露的数量、可以暴露多少种 API、每类 API 是直接对接辖域还是翻译自其他 API，这取决于实际需求，例如 `auth` 广域我只暴露了一个 `rpc` 形式的 `api`，因为我不需要客户端直接访问 `auth`，而是让服务去访问；`user` 广域的 `rest` API，它的实现只是翻译 gRPC 的 API，因为我不仅仅需要客户端访问 `user` 下的辖域，也需要其他的服务也可以访问。
+每个广域都可以暴露 API，各类 API 会以不同的风格划分到对应的包下，例如 `restful` 风格的 API 会被划分到广域下的 `rest` 包下，`protobuf`、 `thrift ` 等服务间通信的 API 将会被划分到 `rpc` 包下，`graphql` 风格的 API 会被划分到 `graphql` 文件夹下等等。至于每类 API 可以暴露的数量、可以暴露多少种 API、每类 API 是直接对接辖域还是翻译自其他 API，这取决于实际需求，例如 `auth` 广域我只暴露了一个 `rpc` 形式的 `api`，因为我不需要客户端直接访问 `auth`，而是让服务去访问；而对于 `user` 广域的 `rest` API，它的实现只是翻译 gRPC 的 API，因为我不仅仅需要客户端访问 `user` 下的辖域，也需要其他的服务也可以访问。
 
 每个辖域可分为三个子包
 
@@ -56,6 +56,8 @@ Rust 强大的抽象能力给构建后端项目提供了很多种可能，导致
 `command` 和 `query` 的任务比较简单，主要为：`参数检查`，`依赖注入` 和 `对接领域模型`，**我希望所有的逻辑都最好只在领域模型中**，这样做的好处是避免逻辑分散到各层之中，难以把握全局逻辑关系。缺点就是领域模型可能会变得异常庞大，需要经常重构，需要编码者有一定的抽象和解耦能力。
 
 这也称为 `DDD(Domain-Driven Design)`
+
+采用这样设计还有一个优点：搭建一个微服务只需要组合不同的辖域，然后暴露 API，如果遇到不可抗因素需要重新规划微服务之间的关系时，使用这种模型重构起来更轻松（所有逻辑都沉降到领域模型中了，领域模型与微服务API无关）
 
 ### PS:
 
