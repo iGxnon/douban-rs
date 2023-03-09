@@ -15,7 +15,7 @@ async fn execute(req: pb::ClearCacheReq, conn: &mut redis::Connection) -> GrpcRe
 }
 
 impl TokenResolver {
-    pub fn create_clear_cache(&self) -> impl Command<pb::ClearCacheReq> + '_ {
+    pub(in crate::auth) fn create_clear_cache(&self) -> impl Command<pb::ClearCacheReq> + '_ {
         move |req: pb::ClearCacheReq| async move { execute(req, self.redis_conn().deref_mut()).await }
     }
 }

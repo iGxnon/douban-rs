@@ -40,7 +40,7 @@ async fn execute(
 }
 
 impl TokenResolver {
-    pub fn create_refresh_token(&self) -> impl Command<pb::RefreshTokenReq> + '_ {
+    pub(in crate::auth) fn create_refresh_token(&self) -> impl Command<pb::RefreshTokenReq> + '_ {
         move |req: pb::RefreshTokenReq| async move {
             let generate_token = self.create_generate_token();
             execute(req, self.decode_key(), self.algorithm(), generate_token).await

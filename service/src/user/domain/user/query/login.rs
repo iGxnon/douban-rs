@@ -20,7 +20,7 @@ async fn execute(
 }
 
 impl UserResolver {
-    pub fn create_login(&self) -> impl Query<pb::LoginReq> + '_ {
+    pub(in crate::user) fn create_login(&self) -> impl Query<pb::LoginReq> + '_ {
         move |req: pb::LoginReq| async move {
             execute(
                 req,

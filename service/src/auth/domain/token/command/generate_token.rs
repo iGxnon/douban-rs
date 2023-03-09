@@ -53,7 +53,7 @@ async fn execute(
 }
 
 impl TokenResolver {
-    pub fn create_generate_token(&self) -> impl Command<pb::GenerateTokenReq> + '_ {
+    pub(in crate::auth) fn create_generate_token(&self) -> impl Command<pb::GenerateTokenReq> + '_ {
         move |req: pb::GenerateTokenReq| async move {
             execute(
                 req,

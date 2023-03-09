@@ -20,7 +20,7 @@ async fn execute(req: pb::BindReq, conn: &mut PgConnection) -> GrpcResult<EmptyR
 }
 
 impl UserResolver {
-    pub fn create_bind(&self) -> impl Command<pb::BindReq> + '_ {
+    pub(in crate::user) fn create_bind(&self) -> impl Command<pb::BindReq> + '_ {
         move |req: pb::BindReq| async move { execute(req, self.pg_conn().deref_mut()).await }
     }
 }

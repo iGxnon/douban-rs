@@ -19,7 +19,7 @@ async fn execute(
 }
 
 impl UserResolver {
-    pub fn create_register(&self) -> impl Command<pb::RegisterReq> + '_ {
+    pub(in crate::user) fn create_register(&self) -> impl Command<pb::RegisterReq> + '_ {
         move |req: pb::RegisterReq| async move {
             execute(req, self.hash_secret(), self.pg_conn().deref_mut()).await
         }

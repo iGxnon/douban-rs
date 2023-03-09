@@ -2,11 +2,15 @@
 
 create table t_oauth
 (
-    id     serial8
+    id         bigserial
         constraint t_oauth_pk
             primary key,
-    github bigint default null
+    github     bigint    default null,
+    created_at timestamp default now() not null,
+    updated_at timestamp default now() not null
 );
+
+SELECT diesel_manage_updated_at('t_oauth');
 
 comment on table t_oauth is 'oauth table for user, used for scalable oauth apps';
 
@@ -23,7 +27,7 @@ comment on index t_oauth_github_index is 'index for github used to locate oauth 
 
 create table t_users
 (
-    id              serial8
+    id              bigserial
         constraint t_users_pk
             primary key,
     oauth_id        bigint       default null
@@ -35,11 +39,12 @@ create table t_users
     nickname        varchar(64)                not null,
     hashed_password varchar(64)                not null,
     role_group      varchar(64)                not null,
-    create_at       timestamp    default now() not null,
-    update_at       timestamp    default now() not null,
-    delete_at       timestamp    default null,
+    created_at      timestamp    default now() not null,
+    updated_at      timestamp    default now() not null,
     last_login      timestamp    default null
 );
+
+SELECT diesel_manage_updated_at('t_users');
 
 comment on table t_users is 'douban_rs users table';
 
@@ -60,12 +65,6 @@ comment on column t_users.email is 'email of user';
 comment on column t_users.nickname is 'nickname of user, default is username, cannot used to login';
 
 comment on column t_users.hashed_password is 'password which is hashed';
-
-comment on column t_users.create_at is 'user create timestamp';
-
-comment on column t_users.update_at is 'user info update timestamp';
-
-comment on column t_users.delete_at is 'soft delete timestamp';
 
 comment on column t_users.last_login is 'last login timestamp';
 

@@ -96,6 +96,7 @@ impl_args! {
     }
 }
 
+// empty response must be a command
 impl_empty_res! {
     (auth, token, v1) {
         ClearCacheReq,

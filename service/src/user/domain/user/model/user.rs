@@ -29,34 +29,20 @@ pub struct User {
     nickname: String,
     hashed_password: String,
     role_group: String,
-    creat_at: NaiveDateTime,
-    update_at: NaiveDateTime,
-    delete_at: Option<NaiveDateTime>,
+    created_at: NaiveDateTime,
+    updated_at: NaiveDateTime,
     last_login: Option<NaiveDateTime>,
 }
 
-#[derive(AsChangeset)]
+#[derive(AsChangeset, Default)]
 #[diesel(table_name = t_users)]
 struct PutUser<'a> {
     phone: Option<&'a str>,
     email: Option<&'a str>,
     nickname: Option<&'a str>,
     hashed_password: Option<&'a str>,
-    update_at: Option<NaiveDateTime>,
+    updated_at: Option<NaiveDateTime>,
     last_login: Option<NaiveDateTime>,
-}
-
-impl<'a> Default for PutUser<'a> {
-    fn default() -> Self {
-        Self {
-            phone: None,
-            email: None,
-            nickname: None,
-            hashed_password: None,
-            update_at: Some(chrono::Local::now().naive_local()),
-            last_login: None,
-        }
-    }
 }
 
 #[derive(Insertable)]
@@ -371,7 +357,7 @@ impl User {
         conn: &mut PgConnection,
     ) -> GrpcResult<()> {
         use migration::t_users::dsl::*;
-
+        // todo check it is already bind?
         diesel::update(t_users.find(self.id))
             .set(PutUser {
                 phone: phone_num.as_deref(),
@@ -402,10 +388,7 @@ impl User {
                         .map_err(|e| internal!(format!("Cannot create a new oauth, err: {}", e)))?;
                     self.oauth_id = Some(oid);
                     diesel::update(t_users::table.find(self.id))
-                        .set((
-                            t_users::oauth_id.eq(oid),
-                            t_users::update_at.eq(chrono::Local::now().naive_local()),
-                        ))
+                        .set(t_users::oauth_id.eq(oid))
                         .execute(conn)
                         .map_err(|e| internal!(format!("Cannot create a new oauth, err: {}", e)))?;
                     Ok(())
