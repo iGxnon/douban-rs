@@ -3,3 +3,20 @@ syntax = "proto3";
 package common.v1;
 
 message EmptyRes {}
+
+message Slice {
+  // slice option 1
+  optional ByLimit limit = 1;
+  // slice option 2
+  optional ByPage page = 2;
+}
+
+message ByLimit {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ByPage {
+  int32 page = 1;
+  int32 per_page = 4;
+}

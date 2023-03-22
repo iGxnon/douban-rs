@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package movie.movie.v1;
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message GetReq {
+  optional int64 id = 1;
+  optional string imdb = 2;
+}
+
+message ListReq {
+  optional string keyword = 3;
+  optional string language = 4;
+  optional TimeRange time_range = 5;
+  optional int32 released_years = 6;
+  optional int64 actor_id = 7;
+  optional string category = 8;
+  optional string country = 9;
+  optional int64 director_id = 10;
+  optional ScoreRange score_range = 11;
+  optional int64 writer_id = 12;
+  optional common.v1.Slice slice = 13;
+}
+
+message PutReq {
+  MoviePayload payload = 1;
+  repeated int64 actors_id = 2;
+  repeated string categories = 3;
+  repeated string countries = 4;
+  repeated int64 directors_id = 5;
+  repeated int64 writers_id = 6;
+}
+
+message DelReq {
+  int64 id = 1;
+}
+
+message TimeRange {
+  // unit (hour)
+  int32 start = 1;
+  int32 end = 2;
+}
+
+message ScoreRange {
+  // unit (1-5)
+  int32 start = 1;
+  int32 end = 2;
+}
+
+message MoviePayload {
+  string title = 1;
+  optional string pic_url = 2;
+  string name = 3;
+  optional string alias_name = 4;
+  string language = 5;
+  int32 time_length = 6;
+  google.protobuf.Timestamp release_date = 7;
+  string imdb = 8;
+  string plot = 9;
+}
+
+message GetRes {
+  int64 id = 1;
+  MoviePayload payload = 2;
+}
+
+message ListRes {
+  repeated GetRes gets = 1;
+}
+
+// CRUD
+service MovieService {
+  rpc GetMovie(GetReq) returns (GetRes) {}
+  rpc ListMovies(ListReq) returns (ListRes) {}
+  rpc PutMovie(PutReq) returns (common.v1.EmptyRes) {}
+  rpc DelMovie(DelReq) returns (common.v1.EmptyRes) {}
+}

@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package movie.celebrity.v1;
+
+import "common/v1/common.proto";
+
+message GetReq {
+  optional int64 id = 1;
+  optional string imdb = 2;
+}
+
+message ListReq {
+  optional string keyword = 1;  // search keyword
+  optional int64 movie_id = 2;  // restrict to a movie
+  optional common.v1.Slice slice = 3;
+}
+
+message PutReq {
+  CelebrityPayload payload = 1;
+  repeated int64 as_actor_movies_id = 2;
+  repeated int64 as_director_movies_id = 5;
+  repeated int64 as_writer_movies_id = 6;
+}
+
+message DelReq {
+  int64 id = 1;
+}
+
+message CelebrityPayload {
+  string name = 1;
+  optional string name_en = 2;
+  optional string pic_url = 3;
+  string gender = 4;
+  string imdb = 5;
+  string info = 6;
+}
+
+message GetRes {
+  int64 id = 1;
+  CelebrityPayload payload = 2;
+}
+
+message ListRes {
+  repeated GetRes gets = 1;
+}
+
+// CRUD
+service CelebrityService {
+  rpc GetCelebrity(GetReq) returns (GetRes) {}
+  rpc ListCelebrities(ListReq) returns (ListRes) {}
+  rpc ListActors(ListReq) returns (ListRes) {}
+  rpc ListDirectors(ListReq) returns (ListRes) {}
+  rpc ListWriters(ListReq) returns (ListRes) {}
+  rpc PutCelebrity(PutReq) returns (common.v1.EmptyRes) {}
+  rpc DelCelebrity(DelReq) returns (common.v1.EmptyRes) {}
+}

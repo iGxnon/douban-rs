@@ -4,8 +4,8 @@ diesel::table! {
     t_celebrities (id) {
         id -> Int8,
         name -> Varchar,
-        name_en -> Varchar,
-        pic_url -> Varchar,
+        name_en -> Nullable<Varchar>,
+        pic_url -> Nullable<Varchar>,
         gender -> Varchar,
         imdb -> Varchar,
         info -> Text,
