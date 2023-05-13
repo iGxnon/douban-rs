@@ -1,5 +1,4 @@
 pub mod pb {
-    // include_proto!(auth, token, v1);
     pub mod auth {
         pub mod token {
             pub mod v1 {
@@ -7,11 +6,27 @@ pub mod pb {
             }
         }
     }
-    // include_proto!(user, sys, v1);
     pub mod user {
         pub mod sys {
             pub mod v1 {
                 include!("./gen/user.sys.v1.rs");
+            }
+        }
+    }
+    pub mod movie {
+        pub mod movie {
+            pub mod v1 {
+                include!("./gen/movie.movie.v1.rs");
+            }
+        }
+        pub mod celebrity {
+            pub mod v1 {
+                include!("./gen/movie.celebrity.v1.rs");
+            }
+        }
+        pub mod score {
+            pub mod v1 {
+                include!("./gen/movie.score.v1.rs");
             }
         }
     }
@@ -74,6 +89,17 @@ impl_args! {
     QueryArgs(auth, token, v1) {
         (ParseTokenReq, ParseTokenRes);
     }
+    QueryArgs(movie, movie, v1) {
+        (GetReq, GetRes);
+        (ListReq, ListRes);
+    }
+    QueryArgs(movie, celebrity, v1) {
+        (GetReq, GetRes);
+        (ListReq, ListRes);
+    }
+    QueryArgs(movie, score, v1) {
+        (GetReq, GetRes);
+    }
 }
 
 // empty response must be a command
@@ -84,5 +110,16 @@ impl_empty_res! {
     (user, sys, v1) {
         RegisterReq,
         BindReq,
+    }
+    (movie, movie, v1) {
+        PutReq,
+        DelReq,
+    }
+    (movie, celebrity, v1) {
+        PutReq,
+        DelReq,
+    }
+    (movie, score, v1) {
+        ScoreReq,
     }
 }

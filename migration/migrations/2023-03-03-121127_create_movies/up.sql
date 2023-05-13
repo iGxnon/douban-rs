@@ -6,17 +6,17 @@ create table t_movies
     id            bigserial
         constraint t_movies_pk
             primary key,
-    title         varchar(512)            not null,
-    pic_url       varchar(512),
-    name          varchar(512)            not null,
-    alias_name    varchar(512),
-    language      varchar(128)            not null,
-    time_length   integer                 not null,
-    released_date date                    not null,
-    imdb          varchar(64)             not null,
-    plot          text      default ''    not null,
-    created_at    timestamp default now() not null,
-    updated_at    timestamp default now() not null
+    title         varchar(512)               not null,
+    pic_url       varchar(512) default null,
+    name          varchar(512)               not null,
+    alias_name    varchar(512) default null,
+    language      varchar(128)               not null,
+    time_length   integer                    not null,
+    released_date date                       not null,
+    imdb          varchar(64)                not null,
+    plot          text         default ''    not null,
+    created_at    timestamp    default now() not null,
+    updated_at    timestamp    default now() not null
 );
 
 select diesel_manage_updated_at('t_movies');
@@ -60,14 +60,14 @@ create table t_celebrities
     id         bigserial
         constraint t_celebrities_pk
             primary key,
-    name       varchar(128)            not null,
-    name_en    varchar(128)            not null,
-    pic_url    varchar(512)            not null,
-    gender     varchar(64)             not null,
-    imdb       varchar(64)             not null,
-    info       text                    not null,
-    created_at timestamp default now() not null,
-    updated_at timestamp default now() not null
+    name       varchar(128)               not null,
+    name_en    varchar(128) default null,
+    pic_url    varchar(512) default null,
+    gender     varchar(64)                not null,
+    imdb       varchar(64)                not null,
+    info       text         default ''    not null,
+    created_at timestamp    default now() not null,
+    updated_at timestamp    default now() not null
 );
 
 select diesel_manage_updated_at('t_celebrities');

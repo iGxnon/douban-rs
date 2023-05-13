@@ -15,14 +15,16 @@ pub struct MovieConfig {
 }
 
 #[derive(Clone)]
-pub struct MovieResolver {}
+pub struct MovieResolver {
+    conf: MovieConfig,
+}
 
 impl Resolver for MovieResolver {
     const TARGET: Target = Target::GRPC;
     const DOMAIN: &'static str = "movie";
-    type Config = ();
+    type Config = MovieConfig;
 
     fn conf(&self) -> &Self::Config {
-        todo!()
+        &self.conf
     }
 }

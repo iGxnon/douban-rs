@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package movie.score.v1;
+
+import "common/v1/common.proto";
+
+message GetReq {
+  int64 movie_id = 1;
+}
+
+message ScoreReq {
+  // 1-5
+  int32 star = 1;
+}
+
+message ScorePayload {
+  float score_avg = 1;
+  int32 cnt_1 = 2;
+  int32 cnt_2 = 3;
+  int32 cnt_3 = 4;
+  int32 cnt_4 = 5;
+  int32 cnt_5 = 6;
+}
+
+message GetRes {
+  ScorePayload payload = 1;
+}
+
+service ScoreService {
+  rpc GetScore(GetReq) returns (GetRes) {}
+  rpc Score(ScoreReq) returns (common.v1.EmptyRes) {}
+}
