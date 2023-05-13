@@ -17,22 +17,13 @@ Rust 强大的抽象能力给构建后端项目提供了很多种可能，导致
 
 基本上敲定如下的设计思路：
 
+1. [混合架构](./design-pattern/混合架构.md)
 1. [配置](./design-pattern/配置.md)
 2. [CQRS (Command Query Responsibility Segregation)](./design-pattern/CQRS.md)
 3. [依赖注入](./design-pattern/依赖注入.md)
 4. [错误处理](./design-pattern/错误处理.md)
 
-防止过度抽象带来的重构复杂，以上则是最基本的设计思路
-
-### Isn't Resolver A God Object？
-
-来自 https://github.com/KodrAus/rust-web-app#isnt-resolver-a-god-object 
-
-虽然在 OOP 编程中，推崇的是让一组对象相互协作式的工作，god object 是一个 bad design，但我写的是 rust 啊，连继承的特性都没有的 OOP 你跟我说什么？（逃
-
-参考了 `rust-web-app` 中的 Resolver，这个项目中，每一个领域 (`domain`) 都有一个 `Resolver`，在这个 domain 的各个地方都有 Resolver 的一些方法实现，所以这就让 Resolver 渐渐变成一个 god object？
-
-我这里将 Resolver 下沉到了每一个 domain，与 rust-web-app 中不一样的是，我构建的是微服务架构的程序，各个 Resolver 之间可以没有关系，这减小了单个 Resolver 的体量。对于一个 domain 来说，它最主要的部分也只是几个 execute 函数的集合，单个 Resolver 主要服务好这几个函数即可。而 domain 体量逐渐膨胀后，应该考虑划分新的 domain 了，而不会对 Resolver 的体量有影响
+以上是最基本的设计思路
 
 ## 细节
 
@@ -57,16 +48,4 @@ Rust 强大的抽象能力给构建后端项目提供了很多种可能，导致
 `command` 和 `query` 的任务比较简单，主要为：`参数检查`，`依赖注入` 和 `对接领域模型`，**我希望所有的逻辑都最好只在领域模型中**，这样做的好处是避免逻辑分散到各层之中，难以把握全局逻辑关系。缺点就是领域模型可能会变得异常庞大，需要经常重构，需要编码者有一定的抽象和解耦能力。
 
 这也称为 `DDD(Domain-Driven Design)`
-
-### 采用这样设计还有一个优点：
-
-搭建一个微服务只需要组合不同的辖域，然后暴露 API，如果遇到不可抗因素需要重新规划微服务之间的关系时，使用这种模型重构起来更轻松（所有逻辑都沉降到领域模型中了，领域模型与微服务API无关）。
-
-举个例子，服务 A 需要划分成服务 B 和 C，我们只需要创建出 B，C 两个辖域的包，把 A 的领域模型分割到这两个包里，将 A，B，C 之间的调用函数参数换成 `impl Command<XX>` or `impl Query<XX>`（这两个 `trait` 本质上就是异步函数，与没分离时A，B，C之间互相调用异步函数一样，重构起来不复杂），在修改 API 层时添加 A，B，C 的 RPC Client 依赖并注入到调用的地方。
-
-还有一个例子，服务 B 和 C 需要聚合成一个服务 A，这甚至不需要修改领域模型层，只需要在 API 层同时使用 B 和 C 的 Resolver 即可。
-
-### PS:
-
-其实这样设计的话，单体服务架构是微服务架构一个特例，即只有一个广域，广域暴露的 API 是面向客户端的（`rest` 和 `graphql` 等），开发者可以很方便地将架构互相转换，根据需求让辖域组合成不同的广域。
 

@@ -1,23 +1,3 @@
-macro_rules! include_proto {
-    ($proj:ident, $domain:ident, $ver:ident) => {
-        pub mod $proj {
-            pub mod $domain {
-                pub mod $ver {
-                    include!(concat!(
-                        "./gen/",
-                        stringify!($proj),
-                        ".",
-                        stringify!($domain),
-                        ".",
-                        stringify!($ver),
-                        ".rs"
-                    ));
-                }
-            }
-        }
-    };
-}
-
 pub mod pb {
     // include_proto!(auth, token, v1);
     pub mod auth {
